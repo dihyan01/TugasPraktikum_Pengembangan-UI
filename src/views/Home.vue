@@ -1,172 +1,485 @@
 <script setup>
-// Jika ada logika atau router yang dibutuhkan
+
 </script>
 
+
 <template>
+
   <div class="home-page">
-    <!-- Hero Section -->
-    <section class="hero">
+
+
+    <!-- HERO SECTION : THE FOLD + Z-PATTERN -->
+    <section class="hero-section">
+
       <div class="hero-content">
-        <span class="badge">Selamat Datang</span>
-        <h1 class="hero-title">Temukan Event & Komunitas Terbaik</h1>
+
+        <span class="badge">
+          Welcome to Gatherly
+        </span>
+
+
+        <h1 class="hero-title">
+          Connect, Discover, and Experience
+        </h1>
+
+
         <p class="hero-subtitle">
-          Jelajahi berbagai kegiatan menarik, seminar, dan workshop interaktif yang dapat mengembangkan skill serta jaringan Anda.
+          A community event platform designed to bring ideas together.
+          Discover hundreds of events near you.
         </p>
-        <div class="hero-actions">
-          <router-link to="/browse" class="btn btn-primary">Jelajahi Event</router-link>
-          <router-link to="/contact" class="btn btn-secondary">Hubungi Kami</router-link>
+
+
+        <div class="hero-action">
+
+          <router-link 
+            to="/browse/events"
+            class="btn-primary">
+            Discover Events
+          </router-link>
+
         </div>
+
+
       </div>
+
     </section>
 
-    <!-- Features Section -->
-    <section class="features">
-      <div class="feature-card">
-        <div class="feature-icon">🚀</div>
-        <h3>Event Terbaru</h3>
-        <p>Akses informasi event terkini dan terpopuler yang diperbarui setiap hari.</p>
+
+
+    <!-- FEATURES SECTION : ADAPTIVE GRID -->
+
+    <section class="features-section">
+
+
+      <div class="features-header">
+
+        <h2>
+          Why Choose Gatherly?
+        </h2>
+
+
+        <p>
+          Everything you need to host or attend unforgettable events.
+        </p>
+
       </div>
 
-      <div class="feature-card">
-        <div class="feature-icon">👥</div>
-        <h3>Komunitas Luas</h3>
-        <p>Bergabung dengan ribuan peserta dan profesional di berbagai bidang.</p>
+
+
+      <div class="features-grid">
+
+
+        <div class="feature-card">
+
+
+          <div class="feature-icon">
+            🔎
+          </div>
+
+
+          <h3>
+            Discover Easily
+          </h3>
+
+
+          <p>
+            Find events tailored to your interests.
+          </p>
+
+
+        </div>
+
+
+
+
+        <div class="feature-card">
+
+
+          <div class="feature-icon">
+            🎟️
+          </div>
+
+
+          <h3>
+            Seamless Ticketing
+          </h3>
+
+
+          <p>
+            Register and get digital tickets instantly.
+          </p>
+
+
+        </div>
+
+
+
+
+        <div class="feature-card">
+
+
+          <div class="feature-icon">
+            📊
+          </div>
+
+
+          <h3>
+            Host Like a Pro
+          </h3>
+
+
+          <p>
+            Manage attendees and events easily.
+          </p>
+
+
+        </div>
+
+
       </div>
 
-      <div class="feature-card">
-        <div class="feature-icon">🎯</div>
-        <h3>Pendaftaran Mudah</h3>
-        <p>Daftarkan diri Anda dalam beberapa langkah praktis tanpa ribet.</p>
-      </div>
+
     </section>
+
+
   </div>
+
+
 </template>
 
+
+
 <style scoped>
+
+/* ==========================
+   GLOBAL HOME LAYOUT
+========================== */
+
+
 .home-page {
+
   display: flex;
+
   flex-direction: column;
-  gap: 4rem;
-  animation: fadeIn 0.5s ease;
+
+  gap: 40px;
+
 }
 
-.hero {
+
+
+/* ==========================
+   HERO SECTION
+   THE FOLD
+========================== */
+
+
+.hero-section {
+
+
+  min-height: 65vh;
+
+
   display: flex;
+
   justify-content: center;
+
+  align-items: center;
+
+
   text-align: center;
-  padding: 5rem 2rem;
+
+
+  padding: 40px;
+
+
   background: #fdfdfd;
-  border-radius: 24px;
-  border: 1px solid #f0f0f0;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.02);
+
+
+  border-radius: 20px;
+
+
+  border: 1px solid #eeeeee;
+
+
 }
+
+
 
 .hero-content {
-  max-width: 800px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+
+  max-width: 750px;
+
 }
+
+
 
 .badge {
+
+
   display: inline-block;
-  padding: 0.5rem 1.2rem;
-  background: rgba(102, 68, 255, 0.08);
+
+
+  padding: 8px 18px;
+
+
+  background: #eeeaff;
+
+
   color: #6644ff;
+
+
   border-radius: 50px;
+
+
+  margin-bottom: 20px;
+
+
   font-weight: 600;
-  font-size: 0.9rem;
-  margin-bottom: 2rem;
-  letter-spacing: 0.5px;
+
+
 }
+
+
 
 .hero-title {
-  font-size: 3.5rem;
+
+
+  font-size: 3rem;
+
+
   font-weight: 800;
+
+
   line-height: 1.2;
+
+
   color: #1c1948;
-  margin-bottom: 1.5rem;
+
+
+  margin-bottom: 20px;
+
+
 }
+
+
 
 .hero-subtitle {
-  font-size: 1.15rem;
+
+
+  font-size: 1.1rem;
+
+
   color: #666;
-  line-height: 1.7;
-  margin-bottom: 2.5rem;
-  max-width: 600px;
+
+
+  line-height: 1.6;
+
+
+  margin-bottom: 25px;
+
+
 }
 
-.hero-actions {
+
+
+.hero-action {
+
   display: flex;
-  gap: 1rem;
+
+  justify-content: center;
+
 }
 
-.btn {
-  padding: 0.8rem 2rem;
-  border-radius: 12px;
-  font-weight: 600;
-  text-decoration: none;
-  transition: all 0.3s ease;
-}
+
 
 .btn-primary {
+
+
+  display: inline-block;
+
+
   background: #6644ff;
+
+
   color: white;
-  box-shadow: 0 4px 15px rgba(102, 68, 255, 0.2);
+
+
+  padding: 12px 28px;
+
+
+  border-radius: 10px;
+
+
+  text-decoration: none;
+
+
+  font-weight: 600;
+
+
+  transition: 0.3s;
+
+
 }
+
+
 
 .btn-primary:hover {
+
+
   background: #5533ee;
-  transform: translateY(-2px);
+
+
+  transform: translateY(-3px);
+
+
 }
 
-.btn-secondary {
-  background: white;
+
+
+
+/* ==========================
+   FEATURES SECTION
+   ADAPTIVE GRID
+========================== */
+
+
+.features-section {
+
+
+  display: flex;
+
+  flex-direction: column;
+
+
+  gap: 20px;
+
+
+}
+
+
+
+.features-header {
+
+
+  text-align: center;
+
+
+}
+
+
+
+.features-header h2 {
+
+
   color: #1c1948;
-  border: 1px solid #e0e0e0;
+
+  margin-bottom: 8px;
+
+
 }
 
-.btn-secondary:hover {
-  border-color: #6644ff;
-  color: #6644ff;
-  transform: translateY(-2px);
+
+
+.features-header p {
+
+
+  color: #666;
+
+
 }
 
-.features {
+
+
+.features-grid {
+
+
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 2rem;
+
+
+  grid-template-columns:
+
+  repeat(auto-fit, minmax(280px, 1fr));
+
+
+  gap: 20px;
+
+
 }
+
+
 
 .feature-card {
+
+
   background: white;
-  padding: 2.5rem;
+
+
+  padding: 24px;
+
+
   border-radius: 16px;
-  border: 1px solid #f0f0f0;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.02);
-  transition: all 0.3s ease;
+
+
+  border: 1px solid #e4e4e7;
+
+
   text-align: center;
+
+
+  transition: 0.3s;
+
+
 }
+
+
 
 .feature-card:hover {
+
+
   transform: translateY(-5px);
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
-  border-color: #e0e0e0;
+
+
 }
+
+
 
 .feature-icon {
-  font-size: 2.5rem;
-  margin-bottom: 1.5rem;
+
+
+  font-size: 35px;
+
+
+  margin-bottom: 15px;
+
+
 }
+
+
 
 .feature-card h3 {
+
+
   color: #1c1948;
-  margin-bottom: 1rem;
-  font-size: 1.3rem;
+
+
+  margin-bottom: 10px;
+
+
 }
 
+
+
 .feature-card p {
+
+
   color: #666;
-  line-height: 1.6;
+
+
+  line-height: 1.5;
+
+
 }
+
+
 </style>

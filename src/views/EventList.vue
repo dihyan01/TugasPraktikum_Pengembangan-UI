@@ -1,172 +1,205 @@
-<script setup>
-// Jika ada logika atau router yang dibutuhkan
-</script>
-
 <template>
-  <div class="home-page">
-    <!-- Hero Section -->
-    <section class="hero">
-      <div class="hero-content">
-        <span class="badge">Selamat Datang</span>
-        <h1 class="hero-title">Temukan Event & Komunitas Terbaik</h1>
-        <p class="hero-subtitle">
-          Jelajahi berbagai kegiatan menarik, seminar, dan workshop interaktif yang dapat mengembangkan skill serta jaringan Anda.
+  <div class="event-list-page">
+    <div class="event-grid">
+      <div 
+        v-for="event in events" 
+        :key="event.id" 
+        class="event-card"
+      >
+        <div class="event-top">
+          <span class="event-date">{{ event.date }}</span>
+          <span class="event-category">{{ event.category }}</span>
+        </div>
+
+        <h3>{{ event.title }}</h3>
+
+        <p class="event-location">
+          <span class="pin-icon">📍</span> {{ event.location }}
         </p>
-        <div class="hero-actions">
-          <router-link to="/browse" class="btn btn-primary">Jelajahi Event</router-link>
-          <router-link to="/contact" class="btn btn-secondary">Hubungi Kami</router-link>
+
+        <p class="event-description">{{ event.description }}</p>
+
+        <div class="event-footer">
+          <router-link :to="`/browse/events/${event.id}`">
+            View Event Details →
+          </router-link>
         </div>
       </div>
-    </section>
-
-    <!-- Features Section -->
-    <section class="features">
-      <div class="feature-card">
-        <div class="feature-icon">🚀</div>
-        <h3>Event Terbaru</h3>
-        <p>Akses informasi event terkini dan terpopuler yang diperbarui setiap hari.</p>
-      </div>
-
-      <div class="feature-card">
-        <div class="feature-icon">👥</div>
-        <h3>Komunitas Luas</h3>
-        <p>Bergabung dengan ribuan peserta dan profesional di berbagai bidang.</p>
-      </div>
-
-      <div class="feature-card">
-        <div class="feature-icon">🎯</div>
-        <h3>Pendaftaran Mudah</h3>
-        <p>Daftarkan diri Anda dalam beberapa langkah praktis tanpa ribet.</p>
-      </div>
-    </section>
+    </div>
   </div>
 </template>
 
+<script setup>
+// Data disesuaikan persis dengan gambar referensi awal Anda
+const events = [
+  {
+    id: 1,
+    date: 'Oct 12, 2026',
+    category: 'WORKSHOP',
+    title: 'Vue.js Mastery Workshop',
+    location: 'Tech Hub, Jakarta',
+    description: 'Learn advanced Vue 3 concepts, Composition API, and state management to build high-performance web applications interactively.'
+  },
+  {
+    id: 2,
+    date: 'Oct 15, 2026',
+    category: 'MEETUP',
+    title: 'National Tech Meetup',
+    location: 'Main Auditorium, City Center',
+    description: 'A gathering of hundreds of developers and tech enthusiasts to share the latest industry trends and expand professional networks.'
+  },
+  {
+    id: 3,
+    date: 'Nov 02, 2026',
+    category: 'COMPETITION',
+    title: 'Startup Pitch Competition',
+    location: 'Innovation Center',
+    description: 'Watch the best local startup founders pitch their innovative ideas live in front of a panel of renowned investors.'
+  },
+  {
+    id: 4,
+    date: 'Nov 10, 2026',
+    category: 'WORKSHOP',
+    title: 'UI/UX Design Sprint',
+    location: 'Creative Studio',
+    description: 'A hands-on session on designing user interfaces by implementing layout systems and visual hierarchy principles.'
+  },
+  {
+    id: 5,
+    date: 'Nov 20, 2026',
+    category: 'SEMINAR',
+    title: 'Digital Marketing Seminar',
+    location: 'Grand Hotel Hall',
+    description: 'An in-depth seminar dissecting modern digital marketing strategies, from SEO optimization to user conversion tactics.'
+  },
+  {
+    id: 6,
+    date: 'Dec 05, 2026',
+    category: 'CONFERENCE',
+    title: 'Community Leaders Summit',
+    location: 'Gatherly HQ',
+    description: 'An exclusive year-end conference for community leaders to formulate sustainable ecosystem development strategies.'
+  }
+]
+</script>
+
 <style scoped>
-.home-page {
-  display: flex;
-  flex-direction: column;
-  gap: 4rem;
-  animation: fadeIn 0.5s ease;
+.event-list-page {
+  padding: 40px;
+  /* Diberi margin-top agar konten turun dan tidak tertutup navbar */
+  margin-top: 80px; 
+  background-color: #f8f9fa;
+  min-height: 100vh;
 }
 
-.hero {
-  display: flex;
-  justify-content: center;
-  text-align: center;
-  padding: 5rem 2rem;
-  background: #fdfdfd;
-  border-radius: 24px;
-  border: 1px solid #f0f0f0;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.02);
+/* GRID 3 COLUMN */
+.event-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
 }
 
-.hero-content {
-  max-width: 800px;
+/* CARD */
+.event-card {
+  background: #ffffff;
+  border: 1px solid #e9ecef;
+  border-radius: 14px;
+  padding: 24px;
   display: flex;
   flex-direction: column;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+}
+
+/* TOP */
+.event-top {
+  display: flex;
+  justify-content: space-between;
   align-items: center;
+  margin-bottom: 20px;
 }
 
-.badge {
-  display: inline-block;
-  padding: 0.5rem 1.2rem;
-  background: rgba(102, 68, 255, 0.08);
-  color: #6644ff;
-  border-radius: 50px;
+.event-date {
+  background: #eeebff;
+  color: #5b46e0;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 13px;
   font-weight: 600;
-  font-size: 0.9rem;
-  margin-bottom: 2rem;
+}
+
+.event-category {
+  font-size: 12px;
+  color: #6c757d;
+  font-weight: 700;
   letter-spacing: 0.5px;
 }
 
-.hero-title {
-  font-size: 3.5rem;
-  font-weight: 800;
-  line-height: 1.2;
-  color: #1c1948;
-  margin-bottom: 1.5rem;
+/* TITLE */
+.event-card h3 {
+  font-size: 20px;
+  font-weight: 700;
+  color: #1a1a2e;
+  margin: 0 0 12px 0;
+  line-height: 1.3;
 }
 
-.hero-subtitle {
-  font-size: 1.15rem;
-  color: #666;
-  line-height: 1.7;
-  margin-bottom: 2.5rem;
-  max-width: 600px;
-}
-
-.hero-actions {
+/* LOCATION */
+.event-location {
+  font-size: 14px;
+  color: #6c757d;
+  margin: 0 0 16px 0;
   display: flex;
-  gap: 1rem;
+  align-items: center;
+  gap: 6px;
 }
 
-.btn {
-  padding: 0.8rem 2rem;
-  border-radius: 12px;
-  font-weight: 600;
-  text-decoration: none;
-  transition: all 0.3s ease;
+.pin-icon {
+  color: #e53935;
+  font-style: normal;
 }
 
-.btn-primary {
-  background: #6644ff;
-  color: white;
-  box-shadow: 0 4px 15px rgba(102, 68, 255, 0.2);
-}
-
-.btn-primary:hover {
-  background: #5533ee;
-  transform: translateY(-2px);
-}
-
-.btn-secondary {
-  background: white;
-  color: #1c1948;
-  border: 1px solid #e0e0e0;
-}
-
-.btn-secondary:hover {
-  border-color: #6644ff;
-  color: #6644ff;
-  transform: translateY(-2px);
-}
-
-.features {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 2rem;
-}
-
-.feature-card {
-  background: white;
-  padding: 2.5rem;
-  border-radius: 16px;
-  border: 1px solid #f0f0f0;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.02);
-  transition: all 0.3s ease;
-  text-align: center;
-}
-
-.feature-card:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
-  border-color: #e0e0e0;
-}
-
-.feature-icon {
-  font-size: 2.5rem;
-  margin-bottom: 1.5rem;
-}
-
-.feature-card h3 {
-  color: #1c1948;
-  margin-bottom: 1rem;
-  font-size: 1.3rem;
-}
-
-.feature-card p {
-  color: #666;
+/* DESCRIPTION */
+.event-description {
+  font-size: 13.5px;
+  color: #6c757d;
   line-height: 1.6;
+  margin: 0 0 24px 0;
+  flex-grow: 1;
+}
+
+/* FOOTER */
+.event-footer {
+  border-top: 1px solid #f1f3f5;
+  padding-top: 16px;
+}
+
+.event-footer a {
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 700;
+  color: #1a1a2e;
+  transition: color 0.2s ease;
+}
+
+.event-footer a:hover {
+  color: #5b46e0;
+}
+
+/* RESPONSIVE */
+@media (max-width: 992px) {
+  .event-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .event-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .event-list-page {
+    padding: 20px;
+    margin-top: 70px;
+  }
 }
 </style>
