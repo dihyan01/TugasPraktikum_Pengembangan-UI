@@ -1,205 +1,174 @@
+<script setup>
+import { ref, computed } from 'vue';
+import { useRouter } from 'vue-router';
+
+import EventCard from '@/components/event/EventCard.vue';
+import SearchBar from '@/components/event/SearchBar.vue';
+import CategoryFilter from '@/components/event/CategoryFilter.vue';
+
+const router = useRouter();
+
+const events = [
+  {
+    id: 1,
+    title: 'Vue.js Mastery Workshop',
+    date: 'Oct 12, 2026',
+    loc: 'Tech Hub, Jakarta',
+    cat: 'Workshop',
+    desc: 'Learn advanced Vue 3 concepts, Composition API, and state management to build high-performance web applications interactively.'
+  },
+  {
+    id: 2,
+    title: 'National Tech Meetup',
+    date: 'Oct 15, 2026',
+    loc: 'Main Auditorium, City Center',
+    cat: 'Meetup',
+    desc: 'A gathering of hundreds of developers and tech enthusiasts to share the latest industry trends and expand professional networks.'
+  },
+  {
+    id: 3,
+    title: 'Startup Pitch Competition',
+    date: 'Nov 02, 2026',
+    loc: 'Innovation Center',
+    cat: 'Competition',
+    desc: 'Watch the best local startup founders pitch their innovative ideas live in front of a panel of renowned investors.'
+  },
+  {
+    id: 4,
+    title: 'UI/UX Design Sprint',
+    date: 'Nov 10, 2026',
+    loc: 'Creative Studio',
+    cat: 'Workshop',
+    desc: 'A hands-on session on designing user interfaces by implementing layout systems and visual hierarchy principles.'
+  },
+  {
+    id: 5,
+    title: 'Digital Marketing Seminar',
+    date: 'Nov 20, 2026',
+    loc: 'Grand Hotel Hall',
+    cat: 'Seminar',
+    desc: 'An in-depth seminar dissecting modern digital marketing strategies, from SEO optimization to user conversion tactics.'
+  },
+  {
+    id: 6,
+    title: "Community Leaders Summit",
+    date: 'Dec 05, 2026',
+    loc: 'Gatherly HQ',
+    cat: 'Conference',
+    desc: 'An exclusive year-end conference for community leaders to formulate sustainable ecosystem development strategies.'
+  }
+];
+
+const searchQuery = ref('');
+const selectedCategory = ref('All');
+const categories = ['All', 'Workshop', 'Meetup', 'Competition', 'Seminar', 'Conference'];
+
+const filteredEvents = computed(() => {
+  return events.filter(event => {
+    const matchSearch = event.title.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
+                        event.loc.toLowerCase().includes(searchQuery.value.toLowerCase());
+    const matchCat = selectedCategory.value === 'All' || event.cat === selectedCategory.value;
+    return matchSearch && matchCat;
+  });
+});
+
+const handleViewDetail = (id) => {
+  router.push(`/browse/events/${id}`);
+};
+</script>
+
 <template>
   <div class="event-list-page">
-    <div class="event-grid">
-      <div 
-        v-for="event in events" 
-        :key="event.id" 
-        class="event-card"
-      >
-        <div class="event-top">
-          <span class="event-date">{{ event.date }}</span>
-          <span class="event-category">{{ event.category }}</span>
-        </div>
+    <div class="content-container">
+      <div class="header-section">
+        <h2 class="section-title">Upcoming Events</h2>
+        <p class="section-desc">Discover workshops, seminars, tech meetups, and competitions near you.</p>
+      </div>
 
-        <h3>{{ event.title }}</h3>
+      <div class="filters-section">
+        <SearchBar v-model="searchQuery" />
+        <CategoryFilter :categories="categories" v-model="selectedCategory" />
+      </div>
 
-        <p class="event-location">
-          <span class="pin-icon">📍</span> {{ event.location }}
-        </p>
+      <div class="event-grid" v-if="filteredEvents.length > 0">
+        <EventCard
+          v-for="event in filteredEvents"
+          :key="event.id"
+          :event="event"
+          @view-detail="handleViewDetail"
+        />
+      </div>
 
-        <p class="event-description">{{ event.description }}</p>
-
-        <div class="event-footer">
-          <router-link :to="`/browse/events/${event.id}`">
-            View Event Details →
-          </router-link>
-        </div>
+      <div v-else class="empty-state">
+        <p>No events found matching your criteria.</p>
       </div>
     </div>
   </div>
 </template>
 
-<script setup>
-// Data disesuaikan persis dengan gambar referensi awal Anda
-const events = [
-  {
-    id: 1,
-    date: 'Oct 12, 2026',
-    category: 'WORKSHOP',
-    title: 'Vue.js Mastery Workshop',
-    location: 'Tech Hub, Jakarta',
-    description: 'Learn advanced Vue 3 concepts, Composition API, and state management to build high-performance web applications interactively.'
-  },
-  {
-    id: 2,
-    date: 'Oct 15, 2026',
-    category: 'MEETUP',
-    title: 'National Tech Meetup',
-    location: 'Main Auditorium, City Center',
-    description: 'A gathering of hundreds of developers and tech enthusiasts to share the latest industry trends and expand professional networks.'
-  },
-  {
-    id: 3,
-    date: 'Nov 02, 2026',
-    category: 'COMPETITION',
-    title: 'Startup Pitch Competition',
-    location: 'Innovation Center',
-    description: 'Watch the best local startup founders pitch their innovative ideas live in front of a panel of renowned investors.'
-  },
-  {
-    id: 4,
-    date: 'Nov 10, 2026',
-    category: 'WORKSHOP',
-    title: 'UI/UX Design Sprint',
-    location: 'Creative Studio',
-    description: 'A hands-on session on designing user interfaces by implementing layout systems and visual hierarchy principles.'
-  },
-  {
-    id: 5,
-    date: 'Nov 20, 2026',
-    category: 'SEMINAR',
-    title: 'Digital Marketing Seminar',
-    location: 'Grand Hotel Hall',
-    description: 'An in-depth seminar dissecting modern digital marketing strategies, from SEO optimization to user conversion tactics.'
-  },
-  {
-    id: 6,
-    date: 'Dec 05, 2026',
-    category: 'CONFERENCE',
-    title: 'Community Leaders Summit',
-    location: 'Gatherly HQ',
-    description: 'An exclusive year-end conference for community leaders to formulate sustainable ecosystem development strategies.'
-  }
-]
-</script>
-
 <style scoped>
 .event-list-page {
-  padding: 40px;
-  /* Diberi margin-top agar konten turun dan tidak tertutup navbar */
-  margin-top: 80px; 
+  padding: 40px 60px;
+  margin-top: 70px;
   background-color: #f8f9fa;
   min-height: 100vh;
+  display: flex;
+  justify-content: center;
 }
 
-/* GRID 3 COLUMN */
+.content-container {
+  width: 100%;
+  max-width: 1200px;
+}
+
+.header-section {
+  margin-bottom: 24px;
+}
+
+.section-title {
+  font-size: 2.2rem;
+  margin-bottom: 8px;
+  color: #1a1a1a;
+  font-weight: 700;
+}
+
+.section-desc {
+  color: #666666;
+  font-size: 1.1rem;
+}
+
+.filters-section {
+  margin-bottom: 30px;
+  width: 100%;
+}
+
 .event-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 24px;
+  gap: 30px;
 }
 
-/* CARD */
-.event-card {
+.empty-state {
+  text-align: center;
+  padding: 40px;
+  color: #666666;
   background: #ffffff;
-  border: 1px solid #e9ecef;
-  border-radius: 14px;
-  padding: 24px;
-  display: flex;
-  flex-direction: column;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
 }
 
-/* TOP */
-.event-top {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-}
-
-.event-date {
-  background: #eeebff;
-  color: #5b46e0;
-  padding: 6px 12px;
-  border-radius: 6px;
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.event-category {
-  font-size: 12px;
-  color: #6c757d;
-  font-weight: 700;
-  letter-spacing: 0.5px;
-}
-
-/* TITLE */
-.event-card h3 {
-  font-size: 20px;
-  font-weight: 700;
-  color: #1a1a2e;
-  margin: 0 0 12px 0;
-  line-height: 1.3;
-}
-
-/* LOCATION */
-.event-location {
-  font-size: 14px;
-  color: #6c757d;
-  margin: 0 0 16px 0;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.pin-icon {
-  color: #e53935;
-  font-style: normal;
-}
-
-/* DESCRIPTION */
-.event-description {
-  font-size: 13.5px;
-  color: #6c757d;
-  line-height: 1.6;
-  margin: 0 0 24px 0;
-  flex-grow: 1;
-}
-
-/* FOOTER */
-.event-footer {
-  border-top: 1px solid #f1f3f5;
-  padding-top: 16px;
-}
-
-.event-footer a {
-  text-decoration: none;
-  font-size: 14px;
-  font-weight: 700;
-  color: #1a1a2e;
-  transition: color 0.2s ease;
-}
-
-.event-footer a:hover {
-  color: #5b46e0;
-}
-
-/* RESPONSIVE */
-@media (max-width: 992px) {
+@media (max-width: 1024px) {
   .event-grid {
     grid-template-columns: repeat(2, 1fr);
   }
 }
 
-@media (max-width: 640px) {
+@media (max-width: 768px) {
   .event-grid {
     grid-template-columns: 1fr;
   }
-
   .event-list-page {
     padding: 20px;
-    margin-top: 70px;
   }
 }
 </style>
