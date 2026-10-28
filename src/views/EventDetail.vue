@@ -1,625 +1,526 @@
+
 <script setup>
-import { ref, reactive } from 'vue';
-import { useRouter } from 'vue-router';
-import { useEvents } from '@/composables/useEvents';
-import AppModal from '@/components/ui/AppModal.vue';
-import AppCard from '@/components/ui/AppCard.vue';
-import AppButton from '@/components/ui/AppButton.vue';
+import { computed } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { useEvents } from '@/composables/useEvents'
 
-const router = useRouter();
+// ==========================================
+// EVENT DETAIL - MODUL 5
+// ==========================================
+
+const route = useRoute()
+const router = useRouter()
+
 const {
-  activeEvents,
-  completedEvents,
-  createEvent,
-  completeEvent,
-  deleteEvent
-} = useEvents();
+  events,
+  userRegistrations,
+  getEventById
+} = useEvents()
 
-// KONDISI TAB AKTIF: 'active' | 'create' | 'completed'
-const currentTab = ref('active');
+// Mengambil event berdasarkan ID URL
+const event = computed(() => {
+  events.value
+  return getEventById(route.params.id)
+})
 
-// STATE FORMULIR CREATE EVENT
-const form = reactive({
-  title: '',
-  cat: 'Workshop',
-  date: '',
-  loc: '',
-  quota: 100,
-  price: 'Free',
-  desc: ''
-});
+// Memeriksa status pendaftaran
+const isRegistered = computed(() => {
+  return userRegistrations.value.some(
+    registration =>
+      registration.eventId === Number(route.params.id)
+  )
+})
 
-const errorMessage = ref('');
-const successMessage = ref('');
+// Memeriksa kuota event
+const isSoldOut = computed(() => {
+  return event.value
+    ? Number(event.value.quota) <= 0
+    : false
+})
 
-// MODAL STATE FOR ACTIONS (Complete & Delete)
-const isModalOpen = ref(false);
-const modalAction = ref('complete'); // 'complete' | 'delete'
-const selectedEvent = ref(null);
-
-const handleOpenCompleteModal = (event) => {
-  selectedEvent.value = event;
-  modalAction.value = 'complete';
-  isModalOpen.value = true;
-};
-
-const handleOpenDeleteModal = (event) => {
-  selectedEvent.value = event;
-  modalAction.value = 'delete';
-  isModalOpen.value = true;
-};
-
-const handleConfirmModal = () => {
-  if (selectedEvent.value) {
-    if (modalAction.value === 'complete') {
-      completeEvent(selectedEvent.value.id);
-    } else if (modalAction.value === 'delete') {
-      deleteEvent(selectedEvent.value.id);
-    }
-    isModalOpen.value = false;
-    selectedEvent.value = null;
-  }
-};
-
-const handleCancelModal = () => {
-  isModalOpen.value = false;
-  selectedEvent.value = null;
-};
-
-// Format helper to convert YYYY-MM-DDTHH:mm into "Nov 25, 2026 • 10:00 AM"
-const formatEventDate = (dt) => {
-  if (!dt) return '';
-  const dateObj = new Date(dt);
-  if (isNaN(dateObj.getTime())) return dt;
-  const datePart = dateObj.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' });
-  const timePart = dateObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-  return `${datePart} • ${timePart}`;
-};
-
-// HANDLER SUBMIT FORM CREATE EVENT
-const handleSubmitEvent = () => {
-  // Validate Empty Input
-  if (!form.title.trim() || !form.date || !form.loc.trim() || !form.desc.trim()) {
-    errorMessage.value = 'Please fill in all required fields before publishing the event!';
-    successMessage.value = '';
-    return;
+// Navigasi ke halaman pendaftaran
+const handleRegisterClick = () => {
+  if (
+    !event.value ||
+    event.value.done ||
+    isRegistered.value ||
+    isSoldOut.value
+  ) {
+    return
   }
 
-  createEvent({
-    title: form.title,
-    cat: form.cat,
-    date: formatEventDate(form.date),
-    loc: form.loc,
-    quota: form.quota,
-    price: form.price,
-    desc: form.desc
-  });
+  router.push(
+    `/browse/events/${event.value.id}/register`
+  )
+}
 
-  // Reset Form
-  form.title = '';
-  form.date = '';
-  form.loc = '';
-  form.quota = 100;
-  form.price = 'Free';
-  form.desc = '';
-  errorMessage.value = '';
-  successMessage.value = 'Event published successfully and is now live!';
+// Kembali ke katalog
+const goBack = () => {
+  router.push('/browse/events')
+}
 
-  // Switch tab back to active list
-  setTimeout(() => {
-    successMessage.value = '';
-    currentTab.value = 'active';
-  }, 1000);
-};
+// Membuka tiket yang sudah terdaftar
+const viewTicket = () => {
+  router.push(
+    `/browse/your-events/${route.params.id}`
+  )
+}
 </script>
 
 <template>
-  <div class="event-management-page">
-    <div class="page-header">
-      <div>
-        <h2>Event Management Control</h2>
-        <p class="subtitle">Manage event lifecycle, publish new events, and archive completed ones.</p>
-      </div>
-      <AppButton variant="primary" @click="currentTab = 'create'">
-        ➕ Create New Event
-      </AppButton>
-    </div>
+  <div class="event-detail-page">
 
-    <!-- TAB NAVIGATION SYSTEM -->
-    <div class="tabs-container">
-      <button
-        :class="['tab-btn', { active: currentTab === 'active' }]"
-        @click="currentTab = 'active'"
-      >
-        ⚡ Active Events ({{ activeEvents.length }})
+    <!-- EVENT FOUND -->
+    <template v-if="event">
+
+      <!-- BACK BUTTON -->
+      <button class="back-link" @click="goBack">
+        ← Back to Events
       </button>
-      <button
-        :class="['tab-btn', { active: currentTab === 'create' }]"
-        @click="currentTab = 'create'"
-      >
-        ➕ Create Event
-      </button>
-      <button
-        :class="['tab-btn', { active: currentTab === 'completed' }]"
-        @click="currentTab = 'completed'"
-      >
-        ✅ Completed Events ({{ completedEvents.length }})
-      </button>
-    </div>
 
-    <!-- TAB 1: ACTIVE EVENTS LIST -->
-    <section v-if="currentTab === 'active'" class="tab-pane">
-      <div v-if="activeEvents.length > 0" class="events-grid">
-        <AppCard v-for="item in activeEvents" :key="item.id" class="organizer-event-card">
-          <div class="card-header">
-            <span class="category-badge">{{ item.cat }}</span>
-            <span class="status-badge status-active">Active</span>
-          </div>
+      <!-- EVENT HEADER -->
+      <div class="event-header">
 
-          <h3 class="event-title">{{ item.title }}</h3>
-          <p class="event-meta">📅 {{ item.date }} &bull; {{ item.loc }}</p>
-          <p class="event-desc">{{ item.desc }}</p>
+        <div class="event-tags">
+          <span class="category-badge">
+            {{ event.cat }}
+          </span>
 
-          <div class="card-actions">
-            <button class="btn-action btn-detail" @click="router.push(`/browse/events/${item.id}`)">
-              👁️ View Details
-            </button>
-            <button class="btn-action btn-complete" @click="handleOpenCompleteModal(item)">
-              ✅ Complete Event
-            </button>
-            <button class="btn-action btn-delete" @click="handleOpenDeleteModal(item)">
-              🗑️ Delete
-            </button>
-          </div>
-        </AppCard>
-      </div>
-
-      <!-- EMPTY STATE ACTIVE -->
-      <div v-else class="empty-state">
-        <div class="empty-icon">📂</div>
-        <h3>No Active Events</h3>
-        <p>All events have ended or none have been created yet. Please create a new event.</p>
-        <AppButton variant="primary" @click="currentTab = 'create'">Create Event Now</AppButton>
-      </div>
-    </section>
-
-    <!-- TAB 2: CREATE EVENT FORM -->
-    <section v-if="currentTab === 'create'" class="tab-pane">
-      <AppCard class="form-card">
-        <h3>Create New Event Form</h3>
-        <p class="form-subtitle">Information entered here will be instantly published to the Gatherly public catalog.</p>
-
-        <div v-if="errorMessage" class="alert-box alert-error">
-          ⚠️ {{ errorMessage }}
+          <span
+            :class="[
+              'status-badge',
+              event.done ? 'status-closed' : 'status-live'
+            ]"
+          >
+            {{ event.done ? 'Event Finished' : 'Event Open' }}
+          </span>
         </div>
 
-        <div v-if="successMessage" class="alert-box alert-success">
-          ✅ {{ successMessage }}
+        <h1>{{ event.title }}</h1>
+
+        <div class="event-meta">
+          <span>📅 {{ event.date }}</span>
+          <span>{{ event.loc }}</span>
+          <span>👥 {{ event.quota }} seats remaining</span>
         </div>
 
-        <form @submit.prevent="handleSubmitEvent" class="event-form">
-          <div class="form-group">
-            <label>Event Title *</label>
-            <input v-model="form.title" type="text" placeholder="e.g. Modern UI/UX Masterclass" class="form-input" />
-          </div>
-
-          <div class="form-row">
-            <div class="form-group">
-              <label>Event Category *</label>
-              <select v-model="form.cat" class="form-input">
-                <option value="Workshop">Workshop</option>
-                <option value="Meetup">Meetup</option>
-                <option value="Competition">Competition</option>
-                <option value="Seminar">Seminar</option>
-                <option value="Conference">Conference</option>
-              </select>
-            </div>
-
-            <div class="form-group">
-              <label>Date & Time *</label>
-              <input v-model="form.date" type="datetime-local" class="form-input" />
-            </div>
-          </div>
-
-          <div class="form-row">
-            <div class="form-group">
-              <label>Event Location *</label>
-              <input v-model="form.loc" type="text" placeholder="e.g. Innovation Center, Jakarta" class="form-input" />
-            </div>
-
-            <div class="form-group">
-              <label>Attendee Quota *</label>
-              <input v-model.number="form.quota" type="number" min="10" placeholder="100" class="form-input" />
-            </div>
-          </div>
-
-          <div class="form-group">
-            <label>Event Description *</label>
-            <textarea v-model="form.desc" rows="4" placeholder="Describe the agenda, speakers, and key takeaways..." class="form-input"></textarea>
-          </div>
-
-          <div class="form-actions">
-            <button type="button" class="btn-secondary-action" @click="currentTab = 'active'">
-              Cancel
-            </button>
-            <AppButton variant="primary" type="submit">
-              🚀 Publish Event Now
-            </AppButton>
-          </div>
-        </form>
-      </AppCard>
-    </section>
-
-    <!-- TAB 3: COMPLETED EVENTS (ARCHIVE) -->
-    <section v-if="currentTab === 'completed'" class="tab-pane">
-      <div v-if="completedEvents.length > 0" class="events-grid">
-        <AppCard v-for="item in completedEvents" :key="item.id" class="organizer-event-card card-completed">
-          <div class="card-header">
-            <span class="category-badge">{{ item.cat }}</span>
-            <span class="status-badge status-completed">Completed</span>
-          </div>
-
-          <h3 class="event-title text-strike">{{ item.title }}</h3>
-          <p class="event-meta">📅 {{ item.date }} &bull; {{ item.loc }}</p>
-          <p class="event-desc">{{ item.desc }}</p>
-
-          <div class="completed-notice">
-            🔒 This event has ended and is archived from the public catalog.
-          </div>
-
-          <div class="card-actions">
-            <button class="btn-action btn-delete" @click="handleOpenDeleteModal(item)">
-              🗑️ Delete from Archive
-            </button>
-          </div>
-        </AppCard>
       </div>
 
-      <!-- EMPTY STATE COMPLETED -->
-      <div v-else class="empty-state">
-        <div class="empty-icon">📁</div>
-        <h3>No Completed Events</h3>
-        <p>Events marked as completed will be archived here permanently.</p>
-      </div>
-    </section>
+      <!-- DETAIL CONTENT -->
+      <div class="detail-grid">
 
-    <!-- MODAL KONFIRMASI DENGAN BACKDROP BLUR (Reused for Complete & Delete) -->
-    <AppModal
-      :is-open="isModalOpen"
-      :title="modalAction === 'complete' ? 'Complete Event' : 'Delete Event Permanently?'"
-      :message="modalAction === 'complete'
-        ? `Are you sure you want to mark '${selectedEvent?.title}' as completed? Once completed, the status is final and the event will be automatically removed from public listings.`
-        : `Are you sure you want to permanently delete '${selectedEvent?.title}'? This action cannot be undone and will permanently remove this event from all records.`"
-      :confirm-text="modalAction === 'complete' ? 'Yes, Complete' : 'Yes, Delete Permanently'"
-      cancel-text="Cancel"
-      @confirm="handleConfirmModal"
-      @close="handleCancelModal"
-    />
+        <!-- LEFT COLUMN -->
+        <section class="event-description-card">
+
+          <h2>About This Event</h2>
+
+          <p class="description-text">
+            {{ event.desc }}
+          </p>
+
+        </section>
+
+        <!-- RIGHT COLUMN -->
+        <aside class="registration-card">
+
+          <h2>Event Registration</h2>
+
+          <!-- EVENT COMPLETED -->
+          <template v-if="event.done">
+            <p class="registration-info">
+              Registration is closed as this event
+              has concluded.
+            </p>
+
+            <button class="btn-disabled" disabled>
+              Registration Closed
+            </button>
+          </template>
+
+          <!-- ALREADY REGISTERED -->
+          <template v-else-if="isRegistered">
+            <p class="registration-info success-text">
+              You are registered for this event.
+              Your booking is confirmed.
+            </p>
+
+            <button class="btn-registered" disabled>
+              Already Registered
+            </button>
+
+            <button
+              class="view-ticket-link"
+              @click="viewTicket"
+            >
+              View Ticket Receipt →
+            </button>
+          </template>
+
+          <!-- SOLD OUT -->
+          <template v-else-if="isSoldOut">
+            <p class="registration-info">
+              All available seats for this event
+              have been booked.
+            </p>
+
+            <button class="btn-disabled" disabled>
+              Sold Out
+            </button>
+          </template>
+
+          <!-- AVAILABLE REGISTRATION -->
+          <template v-else>
+            <p class="registration-info">
+              Secure your spot now before the
+              remaining quota is filled.
+            </p>
+
+            <button
+              class="btn-register"
+              @click="handleRegisterClick"
+            >
+              Register Now
+            </button>
+          </template>
+
+          <div class="registration-footer">
+            {{ event.quota }} seats available
+          </div>
+
+        </aside>
+
+      </div>
+
+    </template>
+
+    <!-- EVENT NOT FOUND -->
+    <div v-else class="not-found-card">
+
+      <div class="not-found-icon">🔎</div>
+
+      <h2>404 - Event Not Found</h2>
+
+      <p>
+        The event you are looking for is unavailable
+        or has been removed by the organizer.
+      </p>
+
+      <button class="btn-register" @click="goBack">
+        Back to Event Catalog
+      </button>
+
+    </div>
+
   </div>
 </template>
 
 <style scoped>
-.event-management-page {
+
+/* =====================================
+   EVENT DETAIL PAGE
+===================================== */
+
+.event-detail-page {
+  width: 100%;
   max-width: 1200px;
   margin: 0 auto;
+  padding: 32px;
+  color: #1c1948;
+  font-family: Inter, Arial, sans-serif;
 }
 
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: var(--space-8);
-  flex-wrap: wrap;
-  gap: var(--space-4);
-}
+/* =====================================
+   BACK LINK
+===================================== */
 
-.page-header h2 {
-  font-size: 2rem;
-  color: var(--text-main);
-  margin-bottom: var(--space-1);
-}
-
-.subtitle {
-  color: var(--text-muted);
-  font-size: 1rem;
-}
-
-/* TAB SYSTEM */
-.tabs-container {
-  display: flex;
-  gap: var(--space-3);
-  border-bottom: 2px solid var(--border-color);
-  margin-bottom: var(--space-8);
-  padding-bottom: var(--space-2);
-}
-
-.tab-btn {
+.back-link {
   background: none;
   border: none;
-  padding: var(--space-3) var(--space-6);
-  font-size: 1.05rem;
+  color: #777789;
+  font-size: 12px;
   font-weight: 600;
-  color: var(--text-muted);
   cursor: pointer;
-  border-radius: 8px;
-  transition: all 0.2s;
+  padding: 0;
+  margin-bottom: 24px;
 }
 
-.tab-btn:hover {
-  background-color: rgba(102, 68, 255, 0.05);
-  color: var(--primary);
+.back-link:hover {
+  color: #6644ff;
 }
 
-.tab-btn.active {
-  background-color: var(--primary);
-  color: white;
+/* =====================================
+   EVENT HEADER
+===================================== */
+
+.event-header {
+  background: #f8f8fc;
+  border: 1px solid #ededf2;
+  border-radius: 14px;
+  padding: 30px;
+  margin-bottom: 28px;
 }
 
-/* ORGANIZER EVENT CARDS GRID */
-.events-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: var(--space-6);
-  margin-bottom: var(--space-12);
-}
-
-.organizer-event-card {
-  padding: var(--space-6);
+.event-tags {
   display: flex;
-  flex-direction: column;
-  height: 100%;
-}
-
-.card-header {
-  display: flex;
-  justify-content: space-between;
   align-items: center;
-  margin-bottom: var(--space-3);
+  gap: 10px;
+  margin-bottom: 18px;
 }
 
 .category-badge {
-  background: rgba(102, 68, 255, 0.1);
-  color: var(--primary);
-  padding: 4px 10px;
-  border-radius: 50px;
-  font-size: 0.8rem;
-  font-weight: 600;
-  text-transform: uppercase;
-}
-
-.status-badge {
-  padding: 4px 10px;
-  border-radius: 50px;
-  font-size: 0.8rem;
+  background: #f0edff;
+  color: #6644ff;
+  padding: 7px 13px;
+  border-radius: 20px;
+  font-size: 11px;
   font-weight: 700;
 }
 
-.status-active {
-  background: rgba(46, 204, 113, 0.15);
-  color: #27ae60;
+.status-badge {
+  padding: 7px 13px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
 }
 
-.status-completed {
-  background: rgba(108, 117, 125, 0.15);
-  color: #6c757d;
+.status-live {
+  background: #dcfce7;
+  color: #16a34a;
 }
 
-.event-title {
-  font-size: 1.3rem;
-  margin-bottom: var(--space-2);
-  color: var(--text-main);
+.status-closed {
+  background: #f1f5f9;
+  color: #64748b;
 }
 
-.text-strike {
-  text-decoration: line-through;
-  color: #8a8d93;
-}
-
-.card-completed {
-  opacity: 0.85;
-  background-color: #fafbfc;
+.event-header h1 {
+  color: #1c1948;
+  font-size: 30px;
+  font-weight: 800;
+  line-height: 1.3;
+  margin: 0 0 20px;
+  overflow-wrap: anywhere;
 }
 
 .event-meta {
-  font-size: 0.9rem;
-  color: var(--text-muted);
-  margin-bottom: var(--space-3);
-}
-
-.event-desc {
-  font-size: 0.95rem;
-  color: var(--text-muted);
-  line-height: 1.6;
-  margin-bottom: var(--space-6);
-  flex-grow: 1;
-}
-
-.completed-notice {
-  background: #f1f3f5;
-  color: #495057;
-  padding: var(--space-3);
-  border-radius: 6px;
-  font-size: 0.85rem;
-  margin-bottom: var(--space-4);
-}
-
-.card-actions {
   display: flex;
-  gap: var(--space-2);
   flex-wrap: wrap;
-  padding-top: var(--space-4);
-  border-top: 1px solid var(--border-color);
-}
-
-.btn-action {
-  flex: 1;
-  padding: var(--space-2) var(--space-3);
-  border-radius: 6px;
-  border: 1px solid var(--border-color);
-  font-size: 0.85rem;
+  align-items: center;
+  gap: 18px;
+  color: #777789;
+  font-size: 12px;
   font-weight: 600;
-  cursor: pointer;
-  background: white;
-  transition: all 0.2s;
-  white-space: nowrap;
 }
 
-.btn-detail:hover {
-  background: var(--bg-light);
-  color: var(--primary);
-  border-color: var(--primary);
-}
+/* =====================================
+   CONTENT GRID
+===================================== */
 
-.btn-complete {
-  color: #27ae60;
-  border-color: rgba(39, 174, 96, 0.3);
-}
-
-.btn-complete:hover {
-  background: #27ae60;
-  color: white;
-}
-
-.btn-delete {
-  color: #e63946;
-  border-color: rgba(230, 57, 70, 0.3);
-  flex: 0 0 auto;
-}
-
-.btn-delete:hover {
-  background: #e63946;
-  color: white;
-}
-
-/* EMPTY STATE */
-.empty-state {
-  text-align: center;
-  padding: var(--space-12);
-  background: white;
-  border: 1px dashed var(--border-color);
-  border-radius: var(--space-4);
-  margin-bottom: var(--space-12);
-}
-
-.empty-icon {
-  font-size: 3rem;
-  margin-bottom: var(--space-3);
-}
-
-.empty-state h3 {
-  font-size: 1.4rem;
-  margin-bottom: var(--space-2);
-}
-
-.empty-state p {
-  color: var(--text-muted);
-  margin-bottom: var(--space-6);
-}
-
-/* FORM CREATE EVENT */
-.form-card {
-  padding: var(--space-8);
-  max-width: 800px;
-  margin: 0 auto var(--space-12) auto;
-}
-
-.form-card h3 {
-  font-size: 1.5rem;
-  margin-bottom: var(--space-1);
-}
-
-.form-subtitle {
-  color: var(--text-muted);
-  margin-bottom: var(--space-6);
-}
-
-.alert-box {
-  padding: var(--space-3) var(--space-4);
-  border-radius: 8px;
-  font-size: 0.95rem;
-  font-weight: 500;
-  margin-bottom: var(--space-6);
-}
-
-.alert-error {
-  background: #ffe3e3;
-  color: #c92a2a;
-  border: 1px solid #ffa8a8;
-}
-
-.alert-success {
-  background: #d3f9d8;
-  color: #2b8a3e;
-  border: 1px solid #b2f2bb;
-}
-
-.event-form {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-5);
-}
-
-.form-row {
+.detail-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--space-4);
+  grid-template-columns:
+    minmax(0, 1fr) 330px;
+  gap: 26px;
+  align-items: start;
 }
 
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
+/* =====================================
+   EVENT DESCRIPTION
+===================================== */
 
-.form-group label {
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: var(--text-main);
-}
-
-.form-input {
-  padding: var(--space-3) var(--space-4);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  font-size: 1rem;
-  outline: none;
-  transition: border-color 0.2s;
-  background: white;
-}
-
-.form-input:focus {
-  border-color: var(--primary);
-}
-
-.form-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--space-4);
-  margin-top: var(--space-4);
-}
-
-.btn-secondary-action {
-  background: var(--bg-light);
-  border: 1px solid var(--border-color);
-  padding: var(--space-3) var(--space-6);
+.event-description-card {
+  background: #ffffff;
+  border: 1px solid #e4e4e7;
   border-radius: 12px;
-  font-weight: 600;
+  padding: 27px;
+  min-height: 260px;
+}
+
+.event-description-card h2 {
+  color: #1c1948;
+  font-size: 19px;
+  font-weight: 800;
+  margin: 0 0 18px;
+  padding-left: 12px;
+  border-left: 4px solid #6644ff;
+}
+
+.description-text {
+  color: #666677;
+  font-size: 13px;
+  line-height: 1.9;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+/* =====================================
+   REGISTRATION CARD
+===================================== */
+
+.registration-card {
+  background: #ffffff;
+  border: 1px solid #e4e4e7;
+  border-radius: 12px;
+  padding: 24px;
+  position: sticky;
+  top: 24px;
+  box-shadow: 0 5px 20px rgba(25, 23, 67, 0.05);
+}
+
+.registration-card h2 {
+  color: #1c1948;
+  font-size: 18px;
+  font-weight: 800;
+  text-align: center;
+  margin: 0 0 15px;
+}
+
+.registration-info {
+  color: #858592;
+  font-size: 12px;
+  line-height: 1.7;
+  text-align: center;
+  margin-bottom: 18px;
+}
+
+.success-text {
+  color: #16a34a;
+}
+
+/* =====================================
+   REGISTRATION BUTTONS
+===================================== */
+
+.btn-register,
+.btn-disabled,
+.btn-registered {
+  display: block;
+  width: 100%;
+  padding: 13px 18px;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.btn-register {
+  background: #6644ff;
+  border: 1px solid #6644ff;
+  color: #ffffff;
   cursor: pointer;
-  color: var(--text-muted);
+  box-shadow: 0 5px 15px rgba(102, 68, 255, 0.2);
+  transition: 0.2s;
 }
 
-.btn-secondary-action:hover {
-  background: #e9ecef;
-  color: var(--text-main);
+.btn-register:hover {
+  background: #5533ee;
+  transform: translateY(-1px);
 }
 
-@media (max-width: 768px) {
-  .form-row {
+.btn-disabled {
+  background: #e4e4e7;
+  border: 1px solid #e4e4e7;
+  color: #858592;
+  cursor: not-allowed;
+}
+
+.btn-registered {
+  background: #dcfce7;
+  border: 1px solid #bbf7d0;
+  color: #15803d;
+  cursor: default;
+}
+
+.view-ticket-link {
+  display: block;
+  width: 100%;
+  margin-top: 12px;
+  padding: 8px;
+  border: none;
+  background: transparent;
+  color: #6644ff;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.registration-footer {
+  color: #9292a0;
+  font-size: 11px;
+  text-align: center;
+  margin-top: 18px;
+}
+
+/* =====================================
+   EVENT NOT FOUND
+===================================== */
+
+.not-found-card {
+  background: white;
+  border: 1px solid #e4e4e7;
+  border-radius: 12px;
+  max-width: 500px;
+  padding: 40px;
+  margin: 40px auto;
+  text-align: center;
+}
+
+.not-found-icon {
+  font-size: 42px;
+  margin-bottom: 15px;
+}
+
+.not-found-card h2 {
+  font-size: 22px;
+  color: #1c1948;
+  margin-bottom: 12px;
+}
+
+.not-found-card p {
+  color: #858592;
+  font-size: 13px;
+  line-height: 1.7;
+  margin-bottom: 20px;
+}
+
+/* =====================================
+   RESPONSIVE
+===================================== */
+
+@media (max-width: 900px) {
+  .detail-grid {
     grid-template-columns: 1fr;
   }
-  .page-header {
+
+  .registration-card {
+    position: static;
+  }
+}
+
+@media (max-width: 600px) {
+  .event-detail-page {
+    padding: 20px 15px;
+  }
+
+  .event-header {
+    padding: 22px;
+  }
+
+  .event-header h1 {
+    font-size: 23px;
+  }
+
+  .event-description-card {
+    padding: 20px;
+  }
+
+  .event-meta {
     flex-direction: column;
     align-items: flex-start;
+    gap: 10px;
   }
 }
 </style>

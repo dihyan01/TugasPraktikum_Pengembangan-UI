@@ -1,180 +1,564 @@
+
 <script setup>
-defineProps({
+import { computed, watch, onUnmounted, nextTick, ref } from 'vue'
+
+// ==========================================
+// MODUL 5 - REUSABLE APP MODAL
+// ==========================================
+
+// ==========================================
+// PROPS
+// ==========================================
+
+const props = defineProps({
   isOpen: {
     type: Boolean,
     default: false
   },
+
   title: {
     type: String,
-    default: 'Action Confirmation'
+    default: 'Confirmation'
   },
+
   message: {
     type: String,
-    default: 'Are you sure you want to proceed with this action?'
+    default: ''
   },
+
   confirmText: {
     type: String,
-    default: 'Yes, Proceed'
+    default: 'Confirm'
   },
+
   cancelText: {
     type: String,
     default: 'Cancel'
-  }
-});
+  },
 
-defineEmits(['confirm', 'close']);
+  variant: {
+    type: String,
+    default: 'danger',
+    validator: value =>
+      ['danger', 'primary', 'success'].includes(value)
+  },
+
+  showFooter: {
+    type: Boolean,
+    default: true
+  },
+
+  closeOnBackdrop: {
+    type: Boolean,
+    default: true
+  },
+
+  closeOnEscape: {
+    type: Boolean,
+    default: true
+  }
+})
+
+// ==========================================
+// EVENTS
+// ==========================================
+
+const emit = defineEmits([
+  'confirm',
+  'close'
+])
+
+// ==========================================
+// REFERENCES
+// ==========================================
+
+const modalRef = ref(null)
+
+// ==========================================
+// COMPUTED
+// ==========================================
+
+const confirmButtonClass = computed(() => {
+  return `btn-confirm btn-${props.variant}`
+})
+
+// ==========================================
+// MODAL HANDLERS
+// ==========================================
+
+const handleClose = () => {
+  emit('close')
+}
+
+const handleConfirm = () => {
+  emit('confirm')
+}
+
+const handleBackdropClick = () => {
+  if (props.closeOnBackdrop) {
+    handleClose()
+  }
+}
+
+
+const handleKeydown = (event) => {
+  if (event.key === 'Escape' && props.isOpen) {
+    if (props.closeOnEscape) {
+      event.preventDefault()
+      handleClose()
+    }
+  }
+}
+
+
+// ==========================================
+// LIFECYCLE & ACCESSIBILITY
+// ==========================================
+
+
+watch(
+  () => props.isOpen,
+  async (isOpen) => {
+    if (isOpen) {
+      window.addEventListener('keydown', handleKeydown)
+
+      await nextTick()
+      modalRef.value?.focus()
+    } else {
+      window.removeEventListener('keydown', handleKeydown)
+    }
+  },
+  { immediate: true }
+)
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleKeydown)
+})
+
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleKeydown)
+})
 </script>
 
 <template>
-  <Transition name="modal-fade">
-    <div v-if="isOpen" class="modal-overlay" @click.self="$emit('close')">
-      <div class="modal-card">
-        <div class="modal-header">
-          <div class="modal-icon">⚠️</div>
-          <h3 class="modal-title">{{ title }}</h3>
+  <Teleport to="body">
+
+    <Transition name="modal-transition">
+
+      <!-- ===================================
+           MODAL OVERLAY
+      ==================================== -->
+
+      <div
+        v-if="isOpen"
+        class="app-modal-overlay"
+        @click.self="handleBackdropClick"
+      >
+
+        <!-- =================================
+             MODAL CONTAINER
+        ================================== -->
+
+        <div
+          ref="modalRef"
+          class="app-modal-card"
+          role="dialog"
+          aria-modal="true"
+          :aria-label="title"
+          tabindex="-1"
+        >
+
+          <!-- ===============================
+               MODAL HEADER
+          ================================ -->
+
+          <div class="modal-header">
+
+            <div class="modal-heading">
+              <span class="modal-heading-icon">
+                {{
+                  variant === 'success'
+                    ? '✅'
+                    : variant === 'danger'
+                      ? '⚠️'
+                      : 'ℹ️'
+                }}
+              </span>
+
+              <h2 class="modal-title">
+                {{ title }}
+              </h2>
+            </div>
+
+            <button
+              type="button"
+              class="modal-close-btn"
+              aria-label="Close modal"
+              @click="handleClose"
+            >
+              ✕
+            </button>
+
+          </div>
+
+          <!-- ===============================
+               MODAL BODY
+          ================================ -->
+
+          <div class="modal-body">
+
+            <!-- CUSTOM CONTENT SLOT -->
+            <slot>
+
+              <!-- DEFAULT MESSAGE -->
+              <p
+                v-if="message"
+                class="modal-message"
+              >
+                {{ message }}
+              </p>
+
+            </slot>
+
+          </div>
+
+          <!-- ===============================
+               MODAL FOOTER
+          ================================ -->
+
+          <div
+            v-if="showFooter"
+            class="modal-footer"
+          >
+
+            <!-- CUSTOM FOOTER SLOT -->
+            <slot
+              name="footer"
+              :confirm="handleConfirm"
+              :close="handleClose"
+            >
+
+              <!-- DEFAULT FOOTER -->
+
+              <button
+                type="button"
+                class="btn-cancel"
+                @click="handleClose"
+              >
+                {{ cancelText }}
+              </button>
+
+              <button
+                type="button"
+                :class="confirmButtonClass"
+                @click="handleConfirm"
+              >
+                {{ confirmText }}
+              </button>
+
+            </slot>
+
+          </div>
+
         </div>
 
-        <div class="modal-body">
-          <p class="modal-message">{{ message }}</p>
-          <slot />
-        </div>
-
-        <div class="modal-footer">
-          <button class="btn-cancel" @click="$emit('close')">
-            {{ cancelText }}
-          </button>
-          <button class="btn-confirm" @click="$emit('confirm')">
-            {{ confirmText }}
-          </button>
-        </div>
       </div>
-    </div>
-  </Transition>
+
+    </Transition>
+
+  </Teleport>
 </template>
 
 <style scoped>
-/* OVERLAY & BACKDROP BLUR
-   Efek buram di sekeliling kotak tengah untuk memusatkan fokus pengguna */
-.modal-overlay {
+
+/* ==========================================
+   APP MODAL OVERLAY
+========================================== */
+
+.app-modal-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  background-color: rgba(15, 23, 42, 0.45);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  inset: 0;
+  z-index: 9999;
+
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 9999;
-  padding: var(--space-4);
+
+  padding: 20px;
+
+  background: rgba(15, 23, 42, 0.55);
+
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+
+  font-family: Inter, Arial, sans-serif;
 }
 
-/* KOTAK DIALOG TENGAH */
-.modal-card {
-  background: white;
+/* ==========================================
+   MODAL CARD
+========================================== */
+
+.app-modal-card {
   width: 100%;
-  max-width: 460px;
-  border-radius: var(--space-4);
-  padding: var(--space-6);
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
-  border: 1px solid var(--border-color);
-  animation: scaleUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  max-width: 490px;
+
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+
+  background: #ffffff;
+  border: 1px solid #e4e4e7;
+  border-radius: 16px;
+
+  box-shadow:
+    0 25px 70px rgba(0, 0, 0, 0.2);
+
+  outline: none;
 }
 
-@keyframes scaleUp {
-  from {
-    opacity: 0;
-    transform: scale(0.95) translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1) translateY(0);
-  }
-}
+/* ==========================================
+   MODAL HEADER
+========================================== */
 
 .modal-header {
   display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  margin-bottom: var(--space-3);
+  justify-content: space-between;
+  align-items: flex-start;
+
+  gap: 15px;
+
+  padding: 24px 26px 19px;
+
+  border-bottom: 1px solid #eeeeF3;
 }
 
-.modal-icon {
-  font-size: 1.8rem;
-  line-height: 1;
+.modal-heading {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+}
+
+.modal-heading-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 42px;
+  height: 42px;
+
+  flex-shrink: 0;
+
+  background: #f5f3ff;
+  border-radius: 11px;
+
+  font-size: 20px;
 }
 
 .modal-title {
-  font-size: 1.25rem;
-  font-weight: 700;
-  color: var(--text-main);
+  color: #1c1948;
+
+  font-size: 19px;
+  font-weight: 800;
+  line-height: 1.4;
+
   margin: 0;
 }
 
+/* ==========================================
+   CLOSE BUTTON
+========================================== */
+
+.modal-close-btn {
+  width: 30px;
+  height: 30px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  background: transparent;
+  border: none;
+  border-radius: 7px;
+
+  color: #9292a0;
+  font-size: 17px;
+
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.modal-close-btn:hover {
+  background: #f4f4f5;
+  color: #1c1948;
+}
+
+/* ==========================================
+   MODAL BODY
+========================================== */
+
 .modal-body {
-  margin-bottom: var(--space-6);
+  padding: 24px 26px;
 }
 
 .modal-message {
-  color: var(--text-muted);
-  font-size: 0.95rem;
-  line-height: 1.6;
   margin: 0;
+
+  color: #777789;
+  font-size: 13px;
+  line-height: 1.8;
+
+  overflow-wrap: anywhere;
 }
+
+/* ==========================================
+   MODAL FOOTER
+========================================== */
 
 .modal-footer {
   display: flex;
   justify-content: flex-end;
-  gap: var(--space-3);
+  align-items: center;
+
+  gap: 12px;
+  flex-wrap: wrap;
+
+  padding: 19px 26px 24px;
+
+  border-top: 1px solid #eeeeF3;
+  background: #fafaff;
 }
 
-.btn-cancel {
-  background: var(--bg-light);
-  color: var(--text-muted);
-  border: 1px solid var(--border-color);
-  padding: var(--space-2) var(--space-4);
+/* ==========================================
+   BUTTONS
+========================================== */
+
+.btn-cancel,
+.btn-confirm {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 11px 18px;
+
   border-radius: 8px;
-  font-weight: 600;
-  font-size: 0.95rem;
+
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+
   cursor: pointer;
-  transition: all 0.2s;
+  transition: 0.2s ease;
+}
+
+/* CANCEL BUTTON */
+
+.btn-cancel {
+  background: #ffffff;
+
+  border: 1px solid #e4e4e7;
+
+  color: #555566;
 }
 
 .btn-cancel:hover {
-  background: #e2e8f0;
-  color: var(--text-main);
+  background: #f4f4f5;
 }
+
+/* CONFIRM BUTTON BASE */
 
 .btn-confirm {
-  background: #e63946;
-  color: white;
-  border: none;
-  padding: var(--space-2) var(--space-5);
-  border-radius: 8px;
-  font-weight: 600;
-  font-size: 0.95rem;
-  cursor: pointer;
-  transition: background-color 0.2s, transform 0.1s;
+  color: #ffffff;
+
+  border: 1px solid transparent;
 }
 
-.btn-confirm:hover {
-  background: #d62828;
+/* DANGER VARIANT */
+
+.btn-danger {
+  background: #e11d48;
+  border-color: #e11d48;
 }
 
-.btn-confirm:active {
-  transform: scale(0.98);
+.btn-danger:hover {
+  background: #be123c;
 }
 
-/* TRANSISI FADE HALUS */
-.modal-fade-enter-active,
-.modal-fade-leave-active {
+/* PRIMARY VARIANT */
+
+.btn-primary {
+  background: #6644ff;
+  border-color: #6644ff;
+}
+
+.btn-primary:hover {
+  background: #5533ee;
+}
+
+/* SUCCESS VARIANT */
+
+.btn-success {
+  background: #16a34a;
+  border-color: #16a34a;
+}
+
+.btn-success:hover {
+  background: #15803d;
+}
+
+/* ==========================================
+   MODAL TRANSITIONS
+========================================== */
+
+.modal-transition-enter-active,
+.modal-transition-leave-active {
   transition: opacity 0.25s ease;
 }
 
-.modal-fade-enter-from,
-.modal-fade-leave-to {
+.modal-transition-enter-active .app-modal-card,
+.modal-transition-leave-active .app-modal-card {
+  transition: transform 0.25s ease;
+}
+
+.modal-transition-enter-from,
+.modal-transition-leave-to {
   opacity: 0;
+}
+
+.modal-transition-enter-from .app-modal-card,
+.modal-transition-leave-to .app-modal-card {
+  transform: translateY(15px) scale(0.97);
+}
+
+/* ==========================================
+   RESPONSIVE
+========================================== */
+
+@media (max-width: 550px) {
+
+  .app-modal-overlay {
+    padding: 15px;
+  }
+
+  .modal-header {
+    padding: 20px 18px;
+  }
+
+  .modal-body {
+    padding: 20px 18px;
+  }
+
+  .modal-footer {
+    flex-direction: column;
+    padding: 18px;
+  }
+
+  .modal-footer button {
+    width: 100%;
+  }
+
+  .modal-title {
+    font-size: 17px;
+  }
+
 }
 </style>

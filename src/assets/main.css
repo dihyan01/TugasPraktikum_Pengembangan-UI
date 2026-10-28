@@ -1,8 +1,14 @@
+
 @import './base.css';
 
-/* =========================
-   GLOBAL RESET
-========================= */
+/* ==========================================
+   GATHERLY - GLOBAL STYLES
+   MODUL 4 - STATE MANAGEMENT
+========================================== */
+
+/* ==========================================
+   1. GLOBAL RESET
+========================================== */
 
 *,
 *::before,
@@ -10,136 +16,272 @@
   box-sizing: border-box;
 }
 
+html {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  min-height: 100%;
+  scroll-behavior: smooth;
+  font-family:
+    Inter,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    Helvetica,
+    Arial,
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
 
-/* =========================
-   SPATIAL SYSTEM & COLOR
-========================= */
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  min-width: 320px;
+  min-height: 100vh;
+  color: #1c1948;
+  background-color: #f5f5f8;
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.5;
+  overflow-x: hidden;
+}
+
+/* ==========================================
+   2. SPACING & COLOR SYSTEM
+========================================== */
 
 :root {
-
-  /* SPATIAL SYSTEM (BASE-8)
-     Konsistensi jarak margin & padding */
-
+  /* SPACING SYSTEM */
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
   --space-4: 16px;
+  --space-5: 20px;
   --space-6: 24px;
   --space-8: 32px;
+  --space-10: 40px;
   --space-12: 48px;
   --space-16: 64px;
 
-
-  /* COLOR SYSTEM */
-
+  /* PRIMARY COLORS */
   --primary: #6644ff;
   --primary-hover: #5533ee;
+  --primary-light: #f0edff;
 
+  /* TEXT COLORS */
   --text-main: #1c1948;
-  --text-muted: #666666;
+  --text-muted: #777789;
+  --text-light: #9292a0;
 
-  --bg-light: #fdfdfd;
-  --bg-gray: #f4f4f5;
+  /* BACKGROUND COLORS */
+  --bg-light: #ffffff;
+  --bg-gray: #f5f5f8;
+  --bg-sidebar: #1c1948;
 
+  /* BORDER */
   --border-color: #e4e4e7;
+
+  /* STATUS COLORS */
+  --success: #22c55e;
+  --danger: #ef4444;
+  --warning: #f59e0b;
+
+  /* RADIUS */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 12px;
+
+  /* SHADOW */
+  --shadow-sm:
+    0 2px 8px rgba(25, 23, 67, 0.04);
+
+  --shadow-md:
+    0 5px 20px rgba(25, 23, 67, 0.06);
+
+  --shadow-primary:
+    0 5px 15px rgba(102, 68, 255, 0.25);
 }
 
-
-/* =========================
-   BODY GLOBAL
-========================= */
-
-body {
-
-  margin: 0;
-
-  font-family:
-  -apple-system,
-  BlinkMacSystemFont,
-  "Segoe UI",
-  Roboto,
-  Helvetica,
-  Arial,
-  sans-serif;
-
-  color: var(--text-main);
-
-  background-color: #ffffff;
-
-  overflow-x: hidden;
-}
-
-
-/* =========================
-   APP CONTAINER
-========================= */
+/* ==========================================
+   3. APP CONTAINER
+========================================== */
 
 #app {
-
   width: 100%;
-
-  max-width: 1280px;
-
-  margin: 0 auto;
-
-  padding: var(--space-8);
-
+  max-width: none;
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+  display: block;
 }
 
+/* ==========================================
+   4. TYPOGRAPHY
+========================================== */
 
-/* =========================
-   LINK STYLE
-========================= */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: inherit;
+  color: var(--text-main);
+  line-height: 1.3;
+  margin-top: 0;
+}
 
-a,
-.green {
+p {
+  margin-top: 0;
+}
 
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ==========================================
+   5. LINK STYLE
+========================================== */
+
+a {
   text-decoration: none;
-
   color: var(--primary);
-
-  transition: 0.3s;
-
+  transition:
+    color 0.2s ease,
+    background-color 0.2s ease;
 }
-
 
 a:hover {
-
   color: var(--primary-hover);
-
 }
 
+.green {
+  color: var(--success);
+}
 
-/* =========================
-   GLOBAL GRID SYSTEM
-   12 Column Layout
-========================= */
+/* ==========================================
+   6. IMAGE AND MEDIA
+========================================== */
 
+img,
+svg,
+video {
+  max-width: 100%;
+}
+
+img {
+  height: auto;
+}
+
+/* ==========================================
+   7. GLOBAL GRID SYSTEM
+========================================== */
 
 .grid-12 {
-
   display: grid;
-
-  grid-template-columns:
-  repeat(12, 1fr);
-
+  grid-template-columns: repeat(12, minmax(0, 1fr));
   gap: var(--space-6);
-
 }
 
+/* ==========================================
+   8. TABLE GLOBAL
+========================================== */
 
-/* =========================
-   RESPONSIVE
-========================= */
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
 
+th,
+td {
+  text-align: left;
+}
 
-@media (min-width:1024px){
+th {
+  font-weight: 600;
+}
 
-  #app {
+/* ==========================================
+   9. FORM GLOBAL
+========================================== */
 
-    padding:
-    0 var(--space-8);
+input,
+textarea,
+select {
+  max-width: 100%;
+  font-size: 14px;
+}
 
+input:focus,
+textarea:focus,
+select:focus {
+  outline-color: var(--primary);
+}
+
+/* ==========================================
+   10. DASHBOARD LAYOUT SUPPORT
+========================================== */
+
+.dashboard-layout {
+  display: flex;
+  width: 100%;
+  min-height: 100vh;
+  background: var(--bg-gray);
+}
+
+.dashboard-main {
+  flex: 1;
+  min-width: 0;
+  min-height: 100vh;
+  background: var(--bg-gray);
+}
+
+.page-content {
+  width: 100%;
+  min-width: 0;
+}
+
+/* ==========================================
+   11. RESPONSIVE
+========================================== */
+
+@media (max-width: 1024px) {
+  .grid-12 {
+    gap: var(--space-4);
+  }
+}
+
+@media (max-width: 768px) {
+  body {
+    font-size: 13px;
   }
 
+  .grid-12 {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+
+  .dashboard-main {
+    min-width: 0;
+  }
+}
+
+@media (max-width: 480px) {
+  .grid-12 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }

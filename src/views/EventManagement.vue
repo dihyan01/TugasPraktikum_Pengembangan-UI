@@ -1,625 +1,725 @@
-<script setup>
-import { ref, reactive } from 'vue';
-import { useRouter } from 'vue-router';
-import { useEvents } from '@/composables/useEvents';
-import AppModal from '@/components/ui/AppModal.vue';
-import AppCard from '@/components/ui/AppCard.vue';
-import AppButton from '@/components/ui/AppButton.vue';
 
-const router = useRouter();
+<script setup>
+import { ref, computed } from 'vue'
+import { useRouter } from 'vue-router'
+
+import { useEvents } from '@/composables/useEvents'
+import OrganizerEventCard from '@/components/event/OrganizerEventCard.vue'
+import EventCreateForm from '@/components/event/EventCreateForm.vue'
+import AppModal from '@/components/ui/AppModal.vue'
+
+// ==========================================
+// MODUL 5 - EVENT MANAGEMENT INTEGRATION
+// ==========================================
+
+const router = useRouter()
+
+// ==========================================
+// CENTRALIZED EVENT STATE
+// ==========================================
+
 const {
   activeEvents,
   completedEvents,
   createEvent,
   completeEvent,
   deleteEvent
-} = useEvents();
+} = useEvents()
 
-// KONDISI TAB AKTIF: 'active' | 'create' | 'completed'
-const currentTab = ref('active');
+// ==========================================
+// TAB NAVIGATION
+// ==========================================
 
-// STATE FORMULIR CREATE EVENT
-const form = reactive({
-  title: '',
-  cat: 'Workshop',
-  date: '',
-  loc: '',
-  quota: 100,
-  price: 'Free',
-  desc: ''
-});
+const currentTab = ref('active')
 
-const errorMessage = ref('');
-const successMessage = ref('');
+const switchTab = (tab) => {
+  currentTab.value = tab
+}
 
-// MODAL STATE FOR ACTIONS (Complete & Delete)
-const isModalOpen = ref(false);
-const modalAction = ref('complete'); // 'complete' | 'delete'
-const selectedEvent = ref(null);
+// ==========================================
+// CREATE EVENT FORM REFERENCE
+// ==========================================
+
+const eventCreateFormRef = ref(null)
+
+// ==========================================
+// CREATE EVENT HANDLER
+// ==========================================
+
+const handleCreateEvent = (eventData) => {
+  try {
+    // Simpan event menggunakan shared state
+    const newEvent = createEvent(eventData)
+
+    if (!newEvent) {
+      eventCreateFormRef.value?.showError(
+        'Unable to publish the event. Please try again.'
+      )
+      return
+    }
+
+    // Tampilkan feedback sukses di form
+    eventCreateFormRef.value?.showSuccess()
+
+    // Tetap di tab Create agar feedback terbaca
+    currentTab.value = 'create'
+
+  } catch (error) {
+    console.error('Create event failed:', error)
+
+    eventCreateFormRef.value?.showError(
+      'Something went wrong while publishing the event.'
+    )
+  }
+}
+
+// ==========================================
+// EVENT DETAIL NAVIGATION
+// ==========================================
+
+const handleViewDetail = (eventId) => {
+  router.push(`/browse/events/${eventId}`)
+}
+
+// ==========================================
+// MODAL STATE
+// ==========================================
+
+const isModalOpen = ref(false)
+const modalAction = ref('')
+const selectedEvent = ref(null)
+
+// ==========================================
+// OPEN COMPLETE MODAL
+// ==========================================
 
 const handleOpenCompleteModal = (event) => {
-  selectedEvent.value = event;
-  modalAction.value = 'complete';
-  isModalOpen.value = true;
-};
+  if (!event || event.done) return
+
+  selectedEvent.value = event
+  modalAction.value = 'complete'
+  isModalOpen.value = true
+}
+
+// ==========================================
+// OPEN DELETE MODAL
+// ==========================================
 
 const handleOpenDeleteModal = (event) => {
-  selectedEvent.value = event;
-  modalAction.value = 'delete';
-  isModalOpen.value = true;
-};
+  if (!event) return
+
+  selectedEvent.value = event
+  modalAction.value = 'delete'
+  isModalOpen.value = true
+}
+
+// ==========================================
+// MODAL CONTENT
+// ==========================================
+
+const modalTitle = computed(() => {
+  return modalAction.value === 'complete'
+    ? 'Complete Event?'
+    : 'Delete Event Permanently?'
+})
+
+const modalMessage = computed(() => {
+  const title = selectedEvent.value?.title || ''
+
+  if (modalAction.value === 'complete') {
+    return (
+      `Are you sure you want to mark "${title}" ` +
+      'as completed? Once completed, the event ' +
+      'will be removed from public listings and ' +
+      'moved to the archive.'
+    )
+  }
+
+  return (
+    `Are you sure you want to permanently delete ` +
+    `"${title}"? This action cannot be undone ` +
+    'and will permanently remove the event ' +
+    'and its associated registrations.'
+  )
+})
+
+const modalConfirmText = computed(() => {
+  return modalAction.value === 'complete'
+    ? 'Yes, Complete'
+    : 'Yes, Delete Permanently'
+})
+
+// ==========================================
+// CLOSE CONFIRMATION MODAL
+// ==========================================
+
+const handleCloseModal = () => {
+  isModalOpen.value = false
+  selectedEvent.value = null
+  modalAction.value = ''
+}
+
+// ==========================================
+// CONFIRM COMPLETE / DELETE
+// ==========================================
 
 const handleConfirmModal = () => {
-  if (selectedEvent.value) {
+  if (!selectedEvent.value) {
+    handleCloseModal()
+    return
+  }
+
+  const eventId = selectedEvent.value.id
+
+  try {
     if (modalAction.value === 'complete') {
-      completeEvent(selectedEvent.value.id);
+      // Memindahkan event ke Completed
+      completeEvent(eventId)
+
+      // Kembali ke tab Completed Events
+      currentTab.value = 'completed'
+
     } else if (modalAction.value === 'delete') {
-      deleteEvent(selectedEvent.value.id);
+      // Menghapus event dan registrasi terkait
+      deleteEvent(eventId)
+
+      // Tetap pada tab yang dipilih
     }
-    isModalOpen.value = false;
-    selectedEvent.value = null;
+
+    handleCloseModal()
+
+  } catch (error) {
+    console.error('Event action failed:', error)
+    handleCloseModal()
+    window.alert(
+      'Unable to process the event action. Please try again.'
+    )
   }
-};
-
-const handleCancelModal = () => {
-  isModalOpen.value = false;
-  selectedEvent.value = null;
-};
-
-// Format helper to convert YYYY-MM-DDTHH:mm into "Nov 25, 2026 • 10:00 AM"
-const formatEventDate = (dt) => {
-  if (!dt) return '';
-  const dateObj = new Date(dt);
-  if (isNaN(dateObj.getTime())) return dt;
-  const datePart = dateObj.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' });
-  const timePart = dateObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-  return `${datePart} • ${timePart}`;
-};
-
-// HANDLER SUBMIT FORM CREATE EVENT
-const handleSubmitEvent = () => {
-  // Validate Empty Input
-  if (!form.title.trim() || !form.date || !form.loc.trim() || !form.desc.trim()) {
-    errorMessage.value = 'Please fill in all required fields before publishing the event!';
-    successMessage.value = '';
-    return;
-  }
-
-  createEvent({
-    title: form.title,
-    cat: form.cat,
-    date: formatEventDate(form.date),
-    loc: form.loc,
-    quota: form.quota,
-    price: form.price,
-    desc: form.desc
-  });
-
-  // Reset Form
-  form.title = '';
-  form.date = '';
-  form.loc = '';
-  form.quota = 100;
-  form.price = 'Free';
-  form.desc = '';
-  errorMessage.value = '';
-  successMessage.value = 'Event published successfully and is now live!';
-
-  // Switch tab back to active list
-  setTimeout(() => {
-    successMessage.value = '';
-    currentTab.value = 'active';
-  }, 1000);
-};
+}
 </script>
 
 <template>
   <div class="event-management-page">
-    <div class="page-header">
-      <div>
-        <h2>Event Management Control</h2>
-        <p class="subtitle">Manage event lifecycle, publish new events, and archive completed ones.</p>
-      </div>
-      <AppButton variant="primary" @click="currentTab = 'create'">
-        ➕ Create New Event
-      </AppButton>
-    </div>
 
-    <!-- TAB NAVIGATION SYSTEM -->
-    <div class="tabs-container">
+    <!-- =====================================
+         PAGE HEADER
+    ====================================== -->
+
+    <header class="page-header">
+
+      <div class="header-content">
+
+        <h1>Event Management Control</h1>
+
+        <p>
+          Manage event lifecycle, publish new events,
+          and archive completed ones.
+        </p>
+
+      </div>
+
       <button
-        :class="['tab-btn', { active: currentTab === 'active' }]"
-        @click="currentTab = 'active'"
+        type="button"
+        class="primary-btn create-header-btn"
+        @click="switchTab('create')"
+      >
+        ＋ Create New Event
+      </button>
+
+    </header>
+
+    <!-- =====================================
+         TAB NAVIGATION
+    ====================================== -->
+
+    <nav
+      class="tab-container"
+      aria-label="Event management tabs"
+    >
+
+      <!-- ACTIVE EVENTS -->
+      <button
+        type="button"
+        class="tab-btn"
+        :class="{ active: currentTab === 'active' }"
+        :aria-current="currentTab === 'active' ? 'page' : undefined"
+        @click="switchTab('active')"
       >
         ⚡ Active Events ({{ activeEvents.length }})
       </button>
+
+      <!-- CREATE EVENT -->
       <button
-        :class="['tab-btn', { active: currentTab === 'create' }]"
-        @click="currentTab = 'create'"
+        type="button"
+        class="tab-btn"
+        :class="{ active: currentTab === 'create' }"
+        :aria-current="currentTab === 'create' ? 'page' : undefined"
+        @click="switchTab('create')"
       >
-        ➕ Create Event
+        ＋ Create Event
       </button>
+
+      <!-- COMPLETED EVENTS -->
       <button
-        :class="['tab-btn', { active: currentTab === 'completed' }]"
-        @click="currentTab = 'completed'"
+        type="button"
+        class="tab-btn"
+        :class="{ active: currentTab === 'completed' }"
+        :aria-current="currentTab === 'completed' ? 'page' : undefined"
+        @click="switchTab('completed')"
       >
         ✅ Completed Events ({{ completedEvents.length }})
       </button>
-    </div>
 
-    <!-- TAB 1: ACTIVE EVENTS LIST -->
-    <section v-if="currentTab === 'active'" class="tab-pane">
-      <div v-if="activeEvents.length > 0" class="events-grid">
-        <AppCard v-for="item in activeEvents" :key="item.id" class="organizer-event-card">
-          <div class="card-header">
-            <span class="category-badge">{{ item.cat }}</span>
-            <span class="status-badge status-active">Active</span>
-          </div>
+    </nav>
 
-          <h3 class="event-title">{{ item.title }}</h3>
-          <p class="event-meta">📅 {{ item.date }} &bull; {{ item.loc }}</p>
-          <p class="event-desc">{{ item.desc }}</p>
+    <!-- =====================================
+         TAB 1 - ACTIVE EVENTS
+    ====================================== -->
 
-          <div class="card-actions">
-            <button class="btn-action btn-detail" @click="router.push(`/browse/events/${item.id}`)">
-              👁️ View Details
-            </button>
-            <button class="btn-action btn-complete" @click="handleOpenCompleteModal(item)">
-              ✅ Complete Event
-            </button>
-            <button class="btn-action btn-delete" @click="handleOpenDeleteModal(item)">
-              🗑️ Delete
-            </button>
-          </div>
-        </AppCard>
+    <section
+      v-if="currentTab === 'active'"
+      class="tab-content"
+    >
+
+      <!-- ACTIVE EVENT CARDS -->
+      <div
+        v-if="activeEvents.length > 0"
+        class="events-grid"
+      >
+
+        <OrganizerEventCard
+          v-for="event in activeEvents"
+          :key="event.id"
+          :event="event"
+          @view-detail="handleViewDetail"
+          @complete="handleOpenCompleteModal"
+          @delete="handleOpenDeleteModal"
+        />
+
       </div>
 
-      <!-- EMPTY STATE ACTIVE -->
-      <div v-else class="empty-state">
-        <div class="empty-icon">📂</div>
-        <h3>No Active Events</h3>
-        <p>All events have ended or none have been created yet. Please create a new event.</p>
-        <AppButton variant="primary" @click="currentTab = 'create'">Create Event Now</AppButton>
-      </div>
-    </section>
+      <!-- ACTIVE EMPTY STATE -->
+      <div
+        v-else
+        class="empty-state"
+      >
 
-    <!-- TAB 2: CREATE EVENT FORM -->
-    <section v-if="currentTab === 'create'" class="tab-pane">
-      <AppCard class="form-card">
-        <h3>Create New Event Form</h3>
-        <p class="form-subtitle">Information entered here will be instantly published to the Gatherly public catalog.</p>
-
-        <div v-if="errorMessage" class="alert-box alert-error">
-          ⚠️ {{ errorMessage }}
+        <div class="empty-icon">
+          📂
         </div>
 
-        <div v-if="successMessage" class="alert-box alert-success">
-          ✅ {{ successMessage }}
+        <h2>No Active Events</h2>
+
+        <p>
+          All events have ended or none have been
+          created yet. Please create a new event.
+        </p>
+
+        <button
+          type="button"
+          class="primary-btn"
+          @click="switchTab('create')"
+        >
+          Create Event Now
+        </button>
+
+      </div>
+
+    </section>
+
+    <!-- =====================================
+         TAB 2 - CREATE EVENT
+    ====================================== -->
+
+    <section
+      v-else-if="currentTab === 'create'"
+      class="tab-content"
+    >
+
+      <EventCreateForm
+        ref="eventCreateFormRef"
+        @submit="handleCreateEvent"
+        @cancel="switchTab('active')"
+      />
+
+    </section>
+
+    <!-- =====================================
+         TAB 3 - COMPLETED EVENTS
+    ====================================== -->
+
+    <section
+      v-else-if="currentTab === 'completed'"
+      class="tab-content"
+    >
+
+      <!-- COMPLETED EVENT CARDS -->
+      <div
+        v-if="completedEvents.length > 0"
+        class="events-grid"
+      >
+
+        <OrganizerEventCard
+          v-for="event in completedEvents"
+          :key="event.id"
+          :event="event"
+          @view-detail="handleViewDetail"
+          @complete="handleOpenCompleteModal"
+          @delete="handleOpenDeleteModal"
+        />
+
+      </div>
+
+      <!-- COMPLETED EMPTY STATE -->
+      <div
+        v-else
+        class="empty-state"
+      >
+
+        <div class="empty-icon">
+          📁
         </div>
 
-        <form @submit.prevent="handleSubmitEvent" class="event-form">
-          <div class="form-group">
-            <label>Event Title *</label>
-            <input v-model="form.title" type="text" placeholder="e.g. Modern UI/UX Masterclass" class="form-input" />
-          </div>
+        <h2>No Completed Events</h2>
 
-          <div class="form-row">
-            <div class="form-group">
-              <label>Event Category *</label>
-              <select v-model="form.cat" class="form-input">
-                <option value="Workshop">Workshop</option>
-                <option value="Meetup">Meetup</option>
-                <option value="Competition">Competition</option>
-                <option value="Seminar">Seminar</option>
-                <option value="Conference">Conference</option>
-              </select>
-            </div>
+        <p>
+          Events marked as completed will be
+          archived here.
+        </p>
 
-            <div class="form-group">
-              <label>Date & Time *</label>
-              <input v-model="form.date" type="datetime-local" class="form-input" />
-            </div>
-          </div>
+        <button
+          type="button"
+          class="outline-btn"
+          @click="switchTab('active')"
+        >
+          View Active Events
+        </button>
 
-          <div class="form-row">
-            <div class="form-group">
-              <label>Event Location *</label>
-              <input v-model="form.loc" type="text" placeholder="e.g. Innovation Center, Jakarta" class="form-input" />
-            </div>
-
-            <div class="form-group">
-              <label>Attendee Quota *</label>
-              <input v-model.number="form.quota" type="number" min="10" placeholder="100" class="form-input" />
-            </div>
-          </div>
-
-          <div class="form-group">
-            <label>Event Description *</label>
-            <textarea v-model="form.desc" rows="4" placeholder="Describe the agenda, speakers, and key takeaways..." class="form-input"></textarea>
-          </div>
-
-          <div class="form-actions">
-            <button type="button" class="btn-secondary-action" @click="currentTab = 'active'">
-              Cancel
-            </button>
-            <AppButton variant="primary" type="submit">
-              🚀 Publish Event Now
-            </AppButton>
-          </div>
-        </form>
-      </AppCard>
-    </section>
-
-    <!-- TAB 3: COMPLETED EVENTS (ARCHIVE) -->
-    <section v-if="currentTab === 'completed'" class="tab-pane">
-      <div v-if="completedEvents.length > 0" class="events-grid">
-        <AppCard v-for="item in completedEvents" :key="item.id" class="organizer-event-card card-completed">
-          <div class="card-header">
-            <span class="category-badge">{{ item.cat }}</span>
-            <span class="status-badge status-completed">Completed</span>
-          </div>
-
-          <h3 class="event-title text-strike">{{ item.title }}</h3>
-          <p class="event-meta">📅 {{ item.date }} &bull; {{ item.loc }}</p>
-          <p class="event-desc">{{ item.desc }}</p>
-
-          <div class="completed-notice">
-            🔒 This event has ended and is archived from the public catalog.
-          </div>
-
-          <div class="card-actions">
-            <button class="btn-action btn-delete" @click="handleOpenDeleteModal(item)">
-              🗑️ Delete from Archive
-            </button>
-          </div>
-        </AppCard>
       </div>
 
-      <!-- EMPTY STATE COMPLETED -->
-      <div v-else class="empty-state">
-        <div class="empty-icon">📁</div>
-        <h3>No Completed Events</h3>
-        <p>Events marked as completed will be archived here permanently.</p>
-      </div>
     </section>
 
-    <!-- MODAL KONFIRMASI DENGAN BACKDROP BLUR (Reused for Complete & Delete) -->
+    <!-- =====================================
+         CONFIRMATION MODAL
+    ====================================== -->
+
     <AppModal
       :is-open="isModalOpen"
-      :title="modalAction === 'complete' ? 'Complete Event' : 'Delete Event Permanently?'"
-      :message="modalAction === 'complete'
-        ? `Are you sure you want to mark '${selectedEvent?.title}' as completed? Once completed, the status is final and the event will be automatically removed from public listings.`
-        : `Are you sure you want to permanently delete '${selectedEvent?.title}'? This action cannot be undone and will permanently remove this event from all records.`"
-      :confirm-text="modalAction === 'complete' ? 'Yes, Complete' : 'Yes, Delete Permanently'"
+      :title="modalTitle"
+      :message="modalMessage"
+      :confirm-text="modalConfirmText"
       cancel-text="Cancel"
+      :variant="modalAction === 'delete' ? 'danger' : 'primary'"
       @confirm="handleConfirmModal"
-      @close="handleCancelModal"
+      @close="handleCloseModal"
     />
+
   </div>
 </template>
 
 <style scoped>
+
+/* ==========================================
+   EVENT MANAGEMENT PAGE
+========================================== */
+
 .event-management-page {
+  width: 100%;
   max-width: 1200px;
+  min-height: 100vh;
+
   margin: 0 auto;
+  padding: 32px;
+
+  background: #f5f5f8;
+
+  color: #1c1948;
+  font-family: Inter, Arial, sans-serif;
+  box-sizing: border-box;
 }
+
+/* ==========================================
+   PAGE HEADER
+========================================== */
 
 .page-header {
   display: flex;
+  align-items: flex-start;
   justify-content: space-between;
+
+  gap: 24px;
+  margin-bottom: 26px;
+}
+
+.header-content {
+  min-width: 0;
+}
+
+.header-content h1 {
+  margin: 0 0 9px;
+
+  color: #1c1948;
+  font-size: 26px;
+  font-weight: 800;
+  line-height: 1.3;
+}
+
+.header-content p {
+  color: #777789;
+  font-size: 13px;
+  line-height: 1.7;
+  margin: 0;
+}
+
+/* ==========================================
+   PRIMARY BUTTON
+========================================== */
+
+.primary-btn {
+  display: inline-flex;
   align-items: center;
-  margin-bottom: var(--space-8);
-  flex-wrap: wrap;
-  gap: var(--space-4);
+  justify-content: center;
+
+  gap: 8px;
+  padding: 11px 20px;
+
+  border: 1px solid #6644ff;
+  border-radius: 8px;
+
+  background: #6644ff;
+  color: #ffffff;
+
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.4;
+
+  cursor: pointer;
+  white-space: nowrap;
+
+  box-shadow:
+    0 5px 15px rgba(102, 68, 255, 0.2);
+
+  transition: 0.2s ease;
 }
 
-.page-header h2 {
-  font-size: 2rem;
-  color: var(--text-main);
-  margin-bottom: var(--space-1);
+.primary-btn:hover {
+  background: #5533ee;
+  border-color: #5533ee;
+  transform: translateY(-1px);
 }
 
-.subtitle {
-  color: var(--text-muted);
-  font-size: 1rem;
-}
+/* ==========================================
+   TAB NAVIGATION
+========================================== */
 
-/* TAB SYSTEM */
-.tabs-container {
+.tab-container {
   display: flex;
-  gap: var(--space-3);
-  border-bottom: 2px solid var(--border-color);
-  margin-bottom: var(--space-8);
-  padding-bottom: var(--space-2);
+  align-items: center;
+  flex-wrap: wrap;
+
+  gap: 10px;
+  margin-bottom: 22px;
 }
 
 .tab-btn {
-  background: none;
-  border: none;
-  padding: var(--space-3) var(--space-6);
-  font-size: 1.05rem;
-  font-weight: 600;
-  color: var(--text-muted);
-  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 10px 15px;
+
+  background: transparent;
+  border: 1px solid transparent;
   border-radius: 8px;
-  transition: all 0.2s;
+
+  color: #777789;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.4;
+
+  cursor: pointer;
+  transition: 0.2s ease;
 }
 
 .tab-btn:hover {
-  background-color: rgba(102, 68, 255, 0.05);
-  color: var(--primary);
+  background: #ece9ff;
+  color: #6644ff;
 }
 
 .tab-btn.active {
-  background-color: var(--primary);
-  color: white;
+  background: #6644ff;
+  color: #ffffff;
+  border-color: #6644ff;
+
+  box-shadow:
+    0 4px 12px rgba(102, 68, 255, 0.18);
 }
 
-/* ORGANIZER EVENT CARDS GRID */
+/* ==========================================
+   TAB CONTENT
+========================================== */
+
+.tab-content {
+  width: 100%;
+  min-width: 0;
+}
+
+/* ==========================================
+   EVENTS GRID
+========================================== */
+
 .events-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: var(--space-6);
-  margin-bottom: var(--space-12);
+
+  grid-template-columns:
+    repeat(auto-fill, minmax(min(100%, 290px), 1fr));
+
+  gap: 20px;
+  align-items: stretch;
 }
 
-.organizer-event-card {
-  padding: var(--space-6);
+/* ==========================================
+   EMPTY STATE
+========================================== */
+
+.empty-state {
   display: flex;
   flex-direction: column;
-  height: 100%;
-}
-
-.card-header {
-  display: flex;
-  justify-content: space-between;
   align-items: center;
-  margin-bottom: var(--space-3);
-}
 
-.category-badge {
-  background: rgba(102, 68, 255, 0.1);
-  color: var(--primary);
-  padding: 4px 10px;
-  border-radius: 50px;
-  font-size: 0.8rem;
-  font-weight: 600;
-  text-transform: uppercase;
-}
+  width: 100%;
 
-.status-badge {
-  padding: 4px 10px;
-  border-radius: 50px;
-  font-size: 0.8rem;
-  font-weight: 700;
-}
+  padding: 55px 25px;
 
-.status-active {
-  background: rgba(46, 204, 113, 0.15);
-  color: #27ae60;
-}
+  background: #ffffff;
 
-.status-completed {
-  background: rgba(108, 117, 125, 0.15);
-  color: #6c757d;
-}
+  border: 1px dashed #e4e4e7;
+  border-radius: 12px;
 
-.event-title {
-  font-size: 1.3rem;
-  margin-bottom: var(--space-2);
-  color: var(--text-main);
-}
-
-.text-strike {
-  text-decoration: line-through;
-  color: #8a8d93;
-}
-
-.card-completed {
-  opacity: 0.85;
-  background-color: #fafbfc;
-}
-
-.event-meta {
-  font-size: 0.9rem;
-  color: var(--text-muted);
-  margin-bottom: var(--space-3);
-}
-
-.event-desc {
-  font-size: 0.95rem;
-  color: var(--text-muted);
-  line-height: 1.6;
-  margin-bottom: var(--space-6);
-  flex-grow: 1;
-}
-
-.completed-notice {
-  background: #f1f3f5;
-  color: #495057;
-  padding: var(--space-3);
-  border-radius: 6px;
-  font-size: 0.85rem;
-  margin-bottom: var(--space-4);
-}
-
-.card-actions {
-  display: flex;
-  gap: var(--space-2);
-  flex-wrap: wrap;
-  padding-top: var(--space-4);
-  border-top: 1px solid var(--border-color);
-}
-
-.btn-action {
-  flex: 1;
-  padding: var(--space-2) var(--space-3);
-  border-radius: 6px;
-  border: 1px solid var(--border-color);
-  font-size: 0.85rem;
-  font-weight: 600;
-  cursor: pointer;
-  background: white;
-  transition: all 0.2s;
-  white-space: nowrap;
-}
-
-.btn-detail:hover {
-  background: var(--bg-light);
-  color: var(--primary);
-  border-color: var(--primary);
-}
-
-.btn-complete {
-  color: #27ae60;
-  border-color: rgba(39, 174, 96, 0.3);
-}
-
-.btn-complete:hover {
-  background: #27ae60;
-  color: white;
-}
-
-.btn-delete {
-  color: #e63946;
-  border-color: rgba(230, 57, 70, 0.3);
-  flex: 0 0 auto;
-}
-
-.btn-delete:hover {
-  background: #e63946;
-  color: white;
-}
-
-/* EMPTY STATE */
-.empty-state {
   text-align: center;
-  padding: var(--space-12);
-  background: white;
-  border: 1px dashed var(--border-color);
-  border-radius: var(--space-4);
-  margin-bottom: var(--space-12);
+
+  box-shadow:
+    0 5px 20px rgba(25, 23, 67, 0.03);
 }
 
 .empty-icon {
-  font-size: 3rem;
-  margin-bottom: var(--space-3);
+  font-size: 44px;
+  margin-bottom: 15px;
 }
 
-.empty-state h3 {
-  font-size: 1.4rem;
-  margin-bottom: var(--space-2);
+.empty-state h2 {
+  color: #1c1948;
+
+  font-size: 20px;
+  font-weight: 800;
+
+  margin: 0 0 10px;
 }
 
 .empty-state p {
-  color: var(--text-muted);
-  margin-bottom: var(--space-6);
+  color: #858592;
+
+  max-width: 450px;
+
+  font-size: 13px;
+  line-height: 1.7;
+
+  margin: 0 0 23px;
 }
 
-/* FORM CREATE EVENT */
-.form-card {
-  padding: var(--space-8);
-  max-width: 800px;
-  margin: 0 auto var(--space-12) auto;
-}
+/* ==========================================
+   OUTLINE BUTTON
+========================================== */
 
-.form-card h3 {
-  font-size: 1.5rem;
-  margin-bottom: var(--space-1);
-}
+.outline-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 
-.form-subtitle {
-  color: var(--text-muted);
-  margin-bottom: var(--space-6);
-}
+  padding: 11px 18px;
 
-.alert-box {
-  padding: var(--space-3) var(--space-4);
+  background: #ffffff;
+  border: 1px solid #e4e4e7;
   border-radius: 8px;
-  font-size: 0.95rem;
-  font-weight: 500;
-  margin-bottom: var(--space-6);
-}
 
-.alert-error {
-  background: #ffe3e3;
-  color: #c92a2a;
-  border: 1px solid #ffa8a8;
-}
+  color: #555566;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
 
-.alert-success {
-  background: #d3f9d8;
-  color: #2b8a3e;
-  border: 1px solid #b2f2bb;
-}
-
-.event-form {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-5);
-}
-
-.form-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--space-4);
-}
-
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
-.form-group label {
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: var(--text-main);
-}
-
-.form-input {
-  padding: var(--space-3) var(--space-4);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  font-size: 1rem;
-  outline: none;
-  transition: border-color 0.2s;
-  background: white;
-}
-
-.form-input:focus {
-  border-color: var(--primary);
-}
-
-.form-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--space-4);
-  margin-top: var(--space-4);
-}
-
-.btn-secondary-action {
-  background: var(--bg-light);
-  border: 1px solid var(--border-color);
-  padding: var(--space-3) var(--space-6);
-  border-radius: 12px;
-  font-weight: 600;
   cursor: pointer;
-  color: var(--text-muted);
+  transition: 0.2s ease;
 }
 
-.btn-secondary-action:hover {
-  background: #e9ecef;
-  color: var(--text-main);
+.outline-btn:hover {
+  background: #f0edff;
+  border-color: #ded8ff;
+  color: #6644ff;
 }
 
-@media (max-width: 768px) {
-  .form-row {
-    grid-template-columns: 1fr;
+/* ==========================================
+   RESPONSIVE TABLET
+========================================== */
+
+@media (max-width: 900px) {
+
+  .event-management-page {
+    padding: 26px 20px;
   }
+
+  .header-content h1 {
+    font-size: 23px;
+  }
+
+  .events-grid {
+    grid-template-columns:
+      repeat(auto-fill, minmax(min(100%, 260px), 1fr));
+  }
+
+}
+
+/* ==========================================
+   RESPONSIVE MOBILE
+========================================== */
+
+@media (max-width: 600px) {
+
+  .event-management-page {
+    padding: 22px 15px;
+  }
+
   .page-header {
     flex-direction: column;
-    align-items: flex-start;
+    align-items: stretch;
+    gap: 18px;
   }
+
+  .header-content h1 {
+    font-size: 21px;
+  }
+
+  .create-header-btn {
+    width: 100%;
+  }
+
+  .tab-container {
+    gap: 6px;
+  }
+
+  .tab-btn {
+    padding: 9px 11px;
+    font-size: 11px;
+  }
+
+  .events-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .empty-state {
+    padding: 40px 18px;
+  }
+
 }
 </style>

@@ -1,34 +1,55 @@
-<script setup lang="ts">
-import { RouterView, RouterLink } from 'vue-router';
+
+<script setup>
+import { useRoute } from 'vue-router'
+
+const route = useRoute()
 </script>
 
 <template>
-  <!-- RAIL & PANE SYSTEM -->
-  <!-- Kerangka khusus untuk kebutuhan produktivitas/pengelolaan aplikasi. -->
   <div class="dashboard-layout">
 
-    <!-- RAIL: Navigasi samping yang posisinya terkunci (fixed) -->
+    <!-- SIDEBAR -->
     <aside class="dashboard-rail">
+
+      <!-- BRAND -->
       <div class="rail-brand">
-        <router-link to="/">Gatherly Organizer</router-link>
+        Gatherly Organizer
       </div>
+
+      <!-- NAVIGATION -->
       <nav class="rail-nav">
-        <router-link to="/dashboard" class="rail-link" exact-active-class="active">Dashboard</router-link>
-        <router-link to="/dashboard/events" class="rail-link" active-class="active">Event Management</router-link>
+
+        <router-link
+          to="/dashboard"
+          class="rail-link"
+          :class="{ active: route.path === '/dashboard' }"
+        >
+          <span class="rail-label">Dashboard</span>
+        </router-link>
+
+        <router-link
+          to="/dashboard/events"
+          class="rail-link"
+          :class="{ active: route.path.startsWith('/dashboard/events') }"
+        >
+          <span class="rail-label">Event Management</span>
+        </router-link>
+
       </nav>
+
+      <!-- SIDEBAR FOOTER -->
       <div class="rail-footer">
-        <router-link to="/" class="rail-link">&larr; Back to Public</router-link>
+        <router-link to="/" class="back-link">
+          ← Back to Public
+        </router-link>
       </div>
+
     </aside>
 
-    <!-- PANE: Area utama dinamis tempat konten berubah dan bisa digulir secara mandiri -->
-    <main class="dashboard-pane">
-      <header class="pane-header">
-        <h1>Dashboard</h1>
-        <div class="user-profile">Admin</div>
-      </header>
-      <div class="pane-content">
-        <RouterView />
+    <!-- MAIN CONTENT -->
+    <main class="dashboard-main">
+      <div class="page-content">
+        <router-view />
       </div>
     </main>
 
@@ -36,75 +57,221 @@ import { RouterView, RouterLink } from 'vue-router';
 </template>
 
 <style scoped>
-/*
-  Full-screen app layout (khas dashboard).
-  Tinggi dibatasi 100vh agar bagian rail tidak ikut terguyur ke atas saat pane di-scroll.
-*/
+
+/* ==========================================
+   DASHBOARD LAYOUT
+========================================== */
+
 .dashboard-layout {
   display: flex;
-  height: 100vh;
-  overflow: hidden;
-  background-color: var(--bg-gray);
+  width: 100%;
+  min-height: 100vh;
+  background: #f5f5f8;
+  font-family: Inter, Arial, sans-serif;
 }
 
-/* RAIL STYLES */
+/* ==========================================
+   SIDEBAR
+========================================== */
+
 .dashboard-rail {
-  width: 260px;
-  background-color: #1c1948; /* Kontras gelap membedakan area nav dan konten */
-  color: white;
+  width: 240px;
+  min-width: 240px;
+  min-height: 100vh;
+
+  background: #1c1948;
+  color: #ffffff;
+
   display: flex;
   flex-direction: column;
+
+  position: sticky;
+  top: 0;
+  height: 100vh;
+
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
 }
+
+/* ==========================================
+   BRAND / LOGO
+========================================== */
 
 .rail-brand {
-  padding: var(--space-6);
-  font-size: 1.2rem;
-  font-weight: 700;
-  border-bottom: 1px solid rgba(255,255,255,0.1);
+  display: flex;
+  align-items: center;
+
+  min-height: 72px;
+  padding: 0 20px;
+
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.4;
+
+  color: #ffffff;
+
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
-.rail-brand a { color: white; text-decoration: none; }
+
+/* ==========================================
+   NAVIGATION
+========================================== */
 
 .rail-nav {
-  flex: 1;
-  padding: var(--space-6) 0;
   display: flex;
   flex-direction: column;
+
+  padding: 12px 0;
+
+  flex: 1;
 }
 
 .rail-link {
-  padding: var(--space-3) var(--space-6);
-  color: #a0a0b0;
+  width: 100%;
+  min-height: 43px;
+
+  display: flex;
+  align-items: center;
+
+  padding: 12px 20px;
+
+  color: #c7c5df;
   text-decoration: none;
+
+  font-size: 13px;
   font-weight: 500;
-  transition: background 0.2s, color 0.2s;
-}
-.rail-link:hover, .rail-link.active {
-  background-color: rgba(255,255,255,0.05);
-  color: white;
-  border-left: 4px solid var(--primary);
+
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease;
 }
 
-.rail-footer { padding: var(--space-6); border-top: 1px solid rgba(255,255,255,0.1); }
+.rail-link:hover {
+  background: rgba(255, 255, 255, 0.07);
+  color: #ffffff;
+}
 
-/* PANE STYLES */
-.dashboard-pane {
+/* ACTIVE MENU */
+
+.rail-link.active {
+  background: rgba(255, 255, 255, 0.09);
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.rail-label {
+  display: block;
+}
+
+/* ==========================================
+   SIDEBAR FOOTER
+========================================== */
+
+.rail-footer {
+  margin-top: auto;
+
+  padding: 18px 20px;
+
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.back-link {
+  color: #a9a7c5;
+  text-decoration: none;
+
+  font-size: 12px;
+  font-weight: 500;
+
+  transition: color 0.2s ease;
+}
+
+.back-link:hover {
+  color: #ffffff;
+}
+
+/* ==========================================
+   MAIN CONTENT
+========================================== */
+
+.dashboard-main {
   flex: 1;
+  min-width: 0;
+  min-height: 100vh;
+
+  background: #f5f5f8;
+
   display: flex;
   flex-direction: column;
-  overflow-y: auto; /* Scroll khusus untuk area ini saja */
 }
 
-.pane-header {
-  background: white;
-  padding: var(--space-4) var(--space-8);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  border-bottom: 1px solid var(--border-color);
-}
-.pane-header h1 { font-size: 1.5rem; margin: 0; }
+.page-content {
+  width: 100%;
+  flex: 1;
 
-.pane-content {
-  padding: var(--space-8);
+  padding: 0;
+  margin: 0;
 }
+
+/* ==========================================
+   RESPONSIVE
+========================================== */
+
+@media (max-width: 768px) {
+  .dashboard-rail {
+    width: 190px;
+    min-width: 190px;
+  }
+
+  .rail-brand {
+    padding: 0 14px;
+    font-size: 13px;
+  }
+
+  .rail-link {
+    padding: 12px 14px;
+    font-size: 12px;
+  }
+
+  .rail-footer {
+    padding: 16px 14px;
+  }
+}
+
+@media (max-width: 480px) {
+  .dashboard-layout {
+    flex-direction: column;
+  }
+
+  .dashboard-rail {
+    position: relative;
+    width: 100%;
+    min-width: 0;
+    min-height: auto;
+    height: auto;
+  }
+
+  .rail-brand {
+    min-height: 55px;
+  }
+
+  .rail-nav {
+    flex-direction: row;
+    padding: 0;
+  }
+
+  .rail-link {
+    width: auto;
+    flex: 1;
+    justify-content: center;
+    text-align: center;
+  }
+
+  .rail-footer {
+    display: none;
+  }
+
+  .dashboard-main {
+    min-height: calc(100vh - 100px);
+  }
+}
+
 </style>

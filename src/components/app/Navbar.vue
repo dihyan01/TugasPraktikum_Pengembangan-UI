@@ -1,34 +1,129 @@
-<script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
-import { useRoute } from 'vue-router'
 
-const isScrolled = ref(false)
+<script setup>
+import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { useRoute } from 'vue-router'
+import { useEvents } from '@/composables/useEvents'
+
+// ==========================================
+// GATHERLY NAVBAR - MODUL 5
+// ==========================================
+
 const route = useRoute()
 
+const { userRegistrations } = useEvents()
+
+// ==========================================
+// NAVBAR STATE
+// ==========================================
+
+const isScrolled = ref(false)
+const isMobileMenuOpen = ref(false)
+const isBrowseOpen = ref(false)
+
+// Jumlah tiket yang tersimpan
+const ticketCount = computed(() => {
+  return userRegistrations.value.length
+})
+
+// ==========================================
+// NAVIGATION MENU
+// ==========================================
+
 const menus = [
-  { name: 'Home', path: '/' },
-  { name: 'About', path: '/about' },
+  {
+    name: 'Home',
+    path: '/'
+  },
+  {
+    name: 'About',
+    path: '/about'
+  },
   {
     name: 'Browse',
-    path: '/browse',
+    path: '/browse/events',
     children: [
       {
         name: 'Event List',
-        path: '/browse/events',
-        children: [{ name: 'Event Detail (Sample)', path: '/browse/events/1' }]
+        path: '/browse/events'
       },
-      { name: 'Category', path: '/browse/category' }
+      {
+        name: 'Category',
+        path: '/browse/category'
+      }
     ]
   },
-  { name: 'Contact', path: '/contact' }
+  {
+    name: 'Your Events',
+    path: '/browse/your-events'
+  },
+  {
+    name: 'Contact',
+    path: '/contact'
+  }
 ]
+
+// ==========================================
+// ACTIVE MENU CHECK
+// ==========================================
+
+const isMenuActive = (menu) => {
+
+  if (menu.name === 'Home') {
+    return route.path === '/'
+  }
+
+  if (menu.name === 'Browse') {
+    return (
+      route.path === '/browse' ||
+      route.path.startsWith('/browse/events') ||
+      route.path.startsWith('/browse/category')
+    )
+  }
+
+  if (menu.name === 'Your Events') {
+    return route.path.startsWith('/browse/your-events')
+  }
+
+  return route.path === menu.path
+}
+
+// ==========================================
+// SCROLL HANDLER
+// ==========================================
 
 const handleScroll = () => {
   isScrolled.value = window.scrollY > 10
 }
 
+// ==========================================
+// MOBILE MENU
+// ==========================================
+
+const toggleMobileMenu = () => {
+  isMobileMenuOpen.value = !isMobileMenuOpen.value
+}
+
+const closeMobileMenu = () => {
+  isMobileMenuOpen.value = false
+  isBrowseOpen.value = false
+}
+
+const toggleBrowseMenu = () => {
+  isBrowseOpen.value = !isBrowseOpen.value
+}
+
+// Tutup menu setelah navigasi
+const handleNavigation = () => {
+  closeMobileMenu()
+}
+
+// ==========================================
+// LIFECYCLE
+// ==========================================
+
 onMounted(() => {
   window.addEventListener('scroll', handleScroll)
+  handleScroll()
 })
 
 onUnmounted(() => {
@@ -37,10 +132,23 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <nav class="navbar" :class="{ scrolled: isScrolled }">
+  <nav
+    class="navbar"
+    :class="{ scrolled: isScrolled }"
+  >
+
     <div class="navbar-container">
-      <!-- Logo -->
-      <router-link to="/" class="logo">
+
+      <!-- ==================================
+           GATHERLY LOGO
+      =================================== -->
+
+      <router-link
+        to="/"
+        class="logo"
+        @click="handleNavigation"
+      >
+
         <svg
           width="28"
           height="32"
@@ -49,7 +157,11 @@ onUnmounted(() => {
           xmlns="http://www.w3.org/2000/svg"
           class="logo-icon"
         >
-          <path d="M12 0L22.3923 6V18L12 24L1.6077 18V6L12 0Z" fill="white" />
+          <path
+            d="M12 0L22.3923 6V18L12 24L1.6077 18V6L12 0Z"
+            fill="white"
+          />
+
           <path
             d="M15 9.5 C15 9.5 14 8 12 8 C9.5 8 8 10 8 12.5 C8 15 9.5 17 12 17 C14 17 15 16 15.5 14.5 V 12.5 H 12.5"
             stroke="#1A1643"
@@ -58,22 +170,42 @@ onUnmounted(() => {
             stroke-linejoin="round"
           />
         </svg>
-        <span class="logo-text">Gatherly</span>
+
+        <span class="logo-text">
+          Gatherly
+        </span>
+
       </router-link>
 
-      <!-- Navigation Menu -->
+      <!-- ==================================
+           DESKTOP NAVIGATION
+      =================================== -->
+
       <ul class="nav-menu">
-        <li v-for="menu in menus" :key="menu.name" class="nav-item">
+
+        <li
+          v-for="menu in menus"
+          :key="menu.name"
+          class="nav-item"
+        >
+
           <router-link
             :to="menu.path"
             class="nav-link"
-            :class="{
-              active:
-                route.path === menu.path ||
-                (menu.path !== '/' && route.path.startsWith(menu.path))
-            }"
+            :class="{ active: isMenuActive(menu) }"
           >
+
             {{ menu.name }}
+
+            <!-- YOUR EVENTS COUNTER -->
+            <span
+              v-if="menu.name === 'Your Events' && ticketCount > 0"
+              class="ticket-counter"
+            >
+              {{ ticketCount }}
+            </span>
+
+            <!-- DROPDOWN ICON -->
             <svg
               v-if="menu.children"
               class="dropdown-indicator"
@@ -88,48 +220,51 @@ onUnmounted(() => {
             >
               <polyline points="6 9 12 15 18 9" />
             </svg>
+
           </router-link>
 
-          <!-- First Level Dropdown -->
-          <ul v-if="menu.children" class="dropdown-menu">
-            <li v-for="child in menu.children" :key="child.name" class="dropdown-item">
-              <router-link :to="child.path" class="dropdown-link">
+          <!-- ==================================
+               BROWSE DROPDOWN
+          =================================== -->
+
+          <ul
+            v-if="menu.children"
+            class="dropdown-menu"
+          >
+
+            <li
+              v-for="child in menu.children"
+              :key="child.name"
+              class="dropdown-item"
+            >
+
+              <router-link
+                :to="child.path"
+                class="dropdown-link"
+              >
                 {{ child.name }}
-                <svg
-                  v-if="child.children"
-                  class="submenu-indicator"
-                  width="12"
-                  height="12"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                >
-                  <polyline points="9 18 15 12 9 6" />
-                </svg>
               </router-link>
 
-              <!-- Second Level Dropdown (Submenu) -->
-              <ul v-if="child.children" class="submenu">
-                <li v-for="subchild in child.children" :key="subchild.name" class="submenu-item">
-                  <router-link :to="subchild.path" class="dropdown-link">
-                    {{ subchild.name }}
-                  </router-link>
-                </li>
-              </ul>
             </li>
+
           </ul>
+
         </li>
+
       </ul>
 
-      <!-- Right Actions (Language & Mobile Menu) -->
+      <!-- ==================================
+           RIGHT ACTIONS
+      =================================== -->
+
       <div class="nav-right">
+
+        <!-- LANGUAGE INDICATOR -->
         <div class="lang-selector">
+
           <svg
-            width="20"
-            height="20"
+            width="19"
+            height="19"
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
@@ -139,314 +274,519 @@ onUnmounted(() => {
           >
             <circle cx="12" cy="12" r="10" />
             <line x1="2" y1="12" x2="22" y2="12" />
-            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+            <path
+              d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1 4-10 15.3 15.3 0 0 1 4-10z"
+            />
           </svg>
+
           <span class="lang-text">EN</span>
+
           <svg
-            width="18"
-            height="18"
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+
+        </div>
+
+        <!-- MOBILE HAMBURGER -->
+        <button
+          type="button"
+          class="hamburger-btn"
+          :aria-expanded="isMobileMenuOpen"
+          aria-label="Toggle navigation menu"
+          @click="toggleMobileMenu"
+        >
+
+          <svg
+            v-if="!isMobileMenuOpen"
+            width="22"
+            height="22"
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
             stroke-width="2"
             stroke-linecap="round"
-            stroke-linejoin="round"
-            class="chevron"
           >
-            <polyline points="6 9 12 15 18 9" />
+            <line x1="4" y1="6" x2="20" y2="6" />
+            <line x1="4" y1="12" x2="20" y2="12" />
+            <line x1="4" y1="18" x2="20" y2="18" />
           </svg>
-        </div>
 
-        <button class="hamburger-btn">
           <svg
-            width="24"
-            height="24"
+            v-else
+            width="22"
+            height="22"
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
-            stroke-width="1.5"
+            stroke-width="2"
             stroke-linecap="round"
-            stroke-linejoin="round"
           >
-            <line x1="4" y1="12" x2="20" y2="12" />
-            <line x1="4" y1="6" x2="20" y2="6" />
-            <line x1="4" y1="18" x2="20" y2="18" />
+            <line x1="5" y1="5" x2="19" y2="19" />
+            <line x1="19" y1="5" x2="5" y2="19" />
           </svg>
+
         </button>
+
       </div>
+
     </div>
+
+    <!-- ==================================
+         MOBILE NAVIGATION PANEL
+    =================================== -->
+
+    <div
+      v-if="isMobileMenuOpen"
+      class="mobile-menu"
+    >
+
+      <template
+        v-for="menu in menus"
+        :key="menu.name"
+      >
+
+        <div
+          v-if="menu.children"
+          class="mobile-menu-group"
+        >
+
+          <button
+            type="button"
+            class="mobile-link"
+            :class="{ active: isMenuActive(menu) }"
+            @click="toggleBrowseMenu"
+          >
+            {{ menu.name }}
+
+            <span>
+              {{ isBrowseOpen ? '⌃' : '⌄' }}
+            </span>
+          </button>
+
+          <div
+            v-if="isBrowseOpen"
+            class="mobile-submenu"
+          >
+
+            <router-link
+              v-for="child in menu.children"
+              :key="child.name"
+              :to="child.path"
+              class="mobile-submenu-link"
+              @click="handleNavigation"
+            >
+              {{ child.name }}
+            </router-link>
+
+          </div>
+
+        </div>
+
+        <router-link
+          v-else
+          :to="menu.path"
+          class="mobile-link"
+          :class="{ active: isMenuActive(menu) }"
+          @click="handleNavigation"
+        >
+          {{ menu.name }}
+
+          <span
+            v-if="menu.name === 'Your Events' && ticketCount > 0"
+            class="ticket-counter"
+          >
+            {{ ticketCount }}
+          </span>
+
+        </router-link>
+
+      </template>
+
+    </div>
+
   </nav>
 </template>
+
 <style scoped>
-/* ==================================
-   NAVBAR BASE & CONTAINER
-   ================================== */
+
+/* ==========================================
+   NAVBAR BASE
+========================================== */
+
 .navbar {
   width: 100%;
-  background: var(--nav-bg, #1c1948);
-  border-bottom: 1px solid var(--nav-border, #333);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  background: #1c1948;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
   position: sticky;
   top: 0;
   z-index: 999;
-  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.navbar-container {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  max-width: 1440px;
-  margin: 0 auto;
-  padding: 0.85rem 2rem;
+  font-family: Inter, Arial, sans-serif;
+  transition: 0.3s ease;
 }
 
 .navbar.scrolled {
-  background: rgba(28, 25, 72, 0.9);
+  background: rgba(28,25,72,0.96);
   backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.22);
 }
 
-/* ==================================
+.navbar-container {
+  width: 100%;
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 13px 28px;
+
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+}
+
+/* ==========================================
    LOGO
-   ================================== */
+========================================== */
+
 .logo {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 10px;
+  flex-shrink: 0;
   text-decoration: none;
-  color: var(--text-white, #fff);
-  padding-right: 2rem;
-  transition: transform 0.3s ease;
-}
-
-.logo:hover {
-  transform: translateY(-2px);
+  color: #ffffff;
 }
 
 .logo-icon {
-  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: transform 0.3s ease;
 }
 
 .logo:hover .logo-icon {
-  transform: rotate(15deg) scale(1.1);
+  transform: rotate(12deg);
 }
 
 .logo-text {
-  font-size: 1.15rem;
-  font-weight: 700;
-  letter-spacing: -0.01em;
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: -0.3px;
 }
 
-/* ==================================
-   NAVIGATION MENU
-   ================================== */
+/* ==========================================
+   DESKTOP NAVIGATION
+========================================== */
+
 .nav-menu {
   display: flex;
   align-items: center;
-  gap: 2.5rem;
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  flex: 1;
   justify-content: center;
+  flex: 1;
+  gap: 13px;
+  list-style: none;
+  padding: 0;
+  margin: 0;
 }
 
 .nav-item {
   position: relative;
   display: flex;
   align-items: center;
-  height: 100%;
-  padding: 1rem 0; /* Memberi ruang hover */
+  padding: 13px 0;
 }
 
 .nav-link {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
+  justify-content: center;
+  gap: 7px;
+
+  color: #ffffff;
   text-decoration: none;
-  color: var(--text-white, #fff);
-  font-size: 0.95rem;
-  font-weight: 500;
-  padding: 0.5rem 1.25rem;
-  border-radius: 10px;
-  transition: all 0.3s ease;
+
+  font-size: 12px;
+  font-weight: 600;
+
+  padding: 11px 15px;
+  border-radius: 8px;
+
+  white-space: nowrap;
+  transition: 0.2s ease;
+}
+
+.nav-link:hover {
+  background: rgba(255,255,255,0.1);
+  color: #ffffff;
 }
 
 .nav-link.active {
-  background-color: var(--primary, #6644ff);
-  font-weight: 600;
-  box-shadow: 0 4px 15px rgba(102, 68, 255, 0.3);
+  color: #ffffff;
+  background: #6644ff;
+  box-shadow: 0 4px 15px rgba(102,68,255,0.3);
 }
 
 .nav-link.active:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(102, 68, 255, 0.5);
+  background: #5533ee;
 }
 
-.nav-link:not(.active):hover {
-  background-color: rgba(255, 255, 255, 0.1);
-  transform: translateY(-2px);
+/* ==========================================
+   YOUR EVENTS COUNTER
+========================================== */
+
+.ticket-counter {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  min-width: 19px;
+  height: 19px;
+
+  padding: 0 5px;
+  border-radius: 20px;
+
+  background: #ffffff;
+  color: #6644ff;
+
+  font-size: 10px;
+  font-weight: 800;
 }
+
+/* ==========================================
+   DROPDOWN ICON
+========================================== */
 
 .dropdown-indicator {
-  transition: transform 0.3s ease;
+  transition: transform 0.2s ease;
 }
 
-.nav-item:hover .dropdown-indicator {
+.nav-item:hover .dropdown-indicator,
+.nav-item:focus-within .dropdown-indicator {
   transform: rotate(180deg);
 }
 
-/* ==================================
-   DROPDOWN & SUBMENU STYLES
-   ================================== */
+/* ==========================================
+   BROWSE DROPDOWN
+========================================== */
+
 .dropdown-menu {
   display: none;
   position: absolute;
   top: 100%;
   left: 0;
-  background-color: #d8d8d8;
-  min-width: 200px;
-  list-style: none;
-  padding: 0;
+
+  min-width: 185px;
   margin: 0;
-  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
-  border-radius: 4px;
+  padding: 7px;
+
+  list-style: none;
+
+  background: #ffffff;
+  border: 1px solid #e4e4e7;
+  border-radius: 10px;
+
+  box-shadow: 0 12px 30px rgba(0,0,0,0.12);
 }
 
-/* Tampilkan dropdown level 1 saat nav-item di-hover */
-.nav-item:hover .dropdown-menu {
+.nav-item:hover .dropdown-menu,
+.nav-item:focus-within .dropdown-menu {
   display: block;
-  animation: fadeIn 0.2s ease-out;
 }
 
 .dropdown-item {
-  position: relative;
+  width: 100%;
 }
 
 .dropdown-link {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px 20px;
-  text-decoration: none;
-  color: #333;
-  font-size: 0.95rem;
-  transition: background-color 0.2s, color 0.2s;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
-}
-
-.dropdown-link:hover {
-  background-color: #c4c4c4;
-  color: #000;
-}
-
-/* Hilangkan border bawah pada item terakhir */
-.dropdown-item:last-child .dropdown-link {
-  border-bottom: none;
-}
-
-/* Submenu (Level 2) */
-.submenu {
-  display: none;
-  position: absolute;
-  top: 0;
-  left: 100%;
-  background-color: #d8d8d8;
-  min-width: 220px;
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
-  border-radius: 4px;
-}
-
-/* Tampilkan submenu level 2 saat dropdown-item di-hover */
-.dropdown-item:hover .submenu {
   display: block;
-  animation: fadeIn 0.2s ease-out;
+  padding: 11px 13px;
+  border-radius: 7px;
+  color: #1c1948;
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: 600;
+  transition: 0.2s ease;
 }
 
-/* ==================================
-   RIGHT SECTION & ACTION BUTTONS
-   ================================== */
+.dropdown-link:hover,
+.dropdown-link.router-link-active {
+  background: #f0edff;
+  color: #6644ff;
+}
+
+/* ==========================================
+   RIGHT ACTIONS
+========================================== */
+
 .nav-right {
   display: flex;
   align-items: center;
-  gap: 1.5rem;
+  gap: 12px;
+  flex-shrink: 0;
 }
 
 .lang-selector {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
-  color: var(--text-white, #fff);
-  font-size: 0.9rem;
-  font-weight: 600;
-  cursor: pointer;
-  padding: 0.5rem;
+  gap: 7px;
+
+  color: #ffffff;
+
+  font-size: 12px;
+  font-weight: 700;
+
+  padding: 8px;
   border-radius: 8px;
-  transition: all 0.3s ease;
 }
 
-.lang-selector:hover {
-  background: rgba(255, 255, 255, 0.1);
-}
-
-.lang-selector:hover .chevron {
-  transform: translateY(2px);
-}
-
-.chevron {
-  transition: transform 0.3s ease;
-  margin-top: 2px;
-}
+/* ==========================================
+   HAMBURGER BUTTON
+========================================== */
 
 .hamburger-btn {
-  display: flex;
+  display: none;
   align-items: center;
   justify-content: center;
-  width: 44px;
-  height: 44px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  border-radius: 10px;
-  color: var(--text-white, #fff);
+
+  width: 40px;
+  height: 40px;
+
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 8px;
+
+  color: #ffffff;
   cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .hamburger-btn:hover {
-  background: rgba(255, 255, 255, 0.15);
-  transform: scale(1.05);
+  background: rgba(255,255,255,0.14);
 }
 
-/* ==================================
-   ANIMATIONS & MEDIA QUERIES
-   ================================== */
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(-5px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+/* ==========================================
+   MOBILE NAVIGATION
+========================================== */
+
+.mobile-menu {
+  display: none;
+  flex-direction: column;
+
+  padding: 10px 16px 18px;
+
+  background: #1c1948;
+  border-top: 1px solid rgba(255,255,255,0.1);
 }
 
-@media (max-width: 900px) {
+.mobile-link {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  padding: 13px 15px;
+
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+
+  color: #ffffff;
+  text-decoration: none;
+
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.mobile-link:hover {
+  background: rgba(255,255,255,0.08);
+  color: #ffffff;
+}
+
+.mobile-link.active {
+  background: #6644ff;
+  color: #ffffff;
+}
+
+.mobile-submenu {
+  display: flex;
+  flex-direction: column;
+  padding: 5px 0 8px 15px;
+}
+
+.mobile-submenu-link {
+  padding: 11px 15px;
+  color: #d5d1f1;
+  text-decoration: none;
+  font-size: 12px;
+  border-radius: 7px;
+}
+
+.mobile-submenu-link:hover {
+  background: rgba(255,255,255,0.08);
+  color: #ffffff;
+}
+
+/* ==========================================
+   RESPONSIVE
+========================================== */
+
+@media (max-width: 1100px) {
+
   .nav-menu {
-    gap: 1rem;
+    gap: 3px;
   }
+
+  .nav-link {
+    padding: 10px 11px;
+    font-size: 11px;
+  }
+
+  .navbar-container {
+    padding: 12px 20px;
+  }
+
 }
 
-@media (max-width: 768px) {
-  .nav-menu,
-  .lang-selector {
+@media (max-width: 800px) {
+
+  .nav-menu {
     display: none;
   }
+
+  .hamburger-btn {
+    display: inline-flex;
+  }
+
+  .mobile-menu {
+    display: flex;
+  }
+
+  .navbar-container {
+    min-height: 65px;
+  }
+
+}
+
+@media (max-width: 480px) {
+
+  .navbar-container {
+    padding: 11px 15px;
+  }
+
+  .logo-text {
+    font-size: 15px;
+  }
+
+  .lang-selector {
+    font-size: 11px;
+    gap: 5px;
+  }
+
 }
 </style>
