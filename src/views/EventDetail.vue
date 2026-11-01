@@ -1,11 +1,12 @@
 
 <script setup>
-import { computed } from 'vue'
+import { computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useEvents } from '@/composables/useEvents'
 
 // ==========================================
-// EVENT DETAIL - MODUL 5
+// MODUL 6 - EVENT DETAIL
+// REST API INTEGRATION
 // ==========================================
 
 const route = useRoute()
@@ -14,32 +15,68 @@ const router = useRouter()
 const {
   events,
   userRegistrations,
-  getEventById
+  loading,
+  error,
+  fetchEventById
 } = useEvents()
 
-// Mengambil event berdasarkan ID URL
-const event = computed(() => {
-  events.value
-  return getEventById(route.params.id)
-})
+// ==========================================
+// EVENT DATA
+// ==========================================
 
-// Memeriksa status pendaftaran
-const isRegistered = computed(() => {
-  return userRegistrations.value.some(
-    registration =>
-      registration.eventId === Number(route.params.id)
+const event = computed(() => {
+  return events.value.find(
+    item => String(item.id) === String(route.params.id)
   )
 })
 
-// Memeriksa kuota event
-const isSoldOut = computed(() => {
-  return event.value
-    ? Number(event.value.quota) <= 0
-    : false
+// ==========================================
+// FETCH EVENT FROM API
+// ==========================================
+
+const loadEvent = async () => {
+  await fetchEventById(route.params.id)
+}
+
+onMounted(() => {
+  loadEvent()
 })
 
-// Navigasi ke halaman pendaftaran
-const handleRegisterClick = () => {
+// Fetch ulang apabila ID pada URL berubah
+watch(
+  () => route.params.id,
+  () => {
+    loadEvent()
+  }
+)
+
+// ==========================================
+// REGISTRATION STATUS
+// ==========================================
+
+const isRegistered = computed(() => {
+  return userRegistrations.value.some(
+    registration =>
+      String(registration.eventId) === String(route.params.id)
+  )
+})
+
+const isSoldOut = computed(() => {
+  return event.value &&
+    Number(event.value.quota) <= 0
+})
+
+const isNotFound = computed(() => {
+  return error.value?.includes(
+    'Event tidak ditemukan di server.'
+  ) || false
+})
+
+// ==========================================
+// NAVIGATION
+// ==========================================
+
+const handleRegister = () => {
   if (
     !event.value ||
     event.value.done ||
@@ -54,63 +91,175 @@ const handleRegisterClick = () => {
   )
 }
 
-// Kembali ke katalog
+const handleViewTicket = () => {
+  router.push(
+    `/browse/your-events/${route.params.id}`
+  )
+}
+
 const goBack = () => {
   router.push('/browse/events')
 }
 
-// Membuka tiket yang sudah terdaftar
-const viewTicket = () => {
-  router.push(
-    `/browse/your-events/${route.params.id}`
-  )
+// ==========================================
+// RETRY API REQUEST
+// ==========================================
+
+const retryFetch = async () => {
+  await fetchEventById(route.params.id)
 }
 </script>
 
 <template>
   <div class="event-detail-page">
 
-    <!-- EVENT FOUND -->
-    <template v-if="event">
+    <!-- ==================================
+         LOADING STATE
+    =================================== -->
+
+    <div
+      v-if="loading && !event"
+      class="loading-container"
+    >
+      <div class="loading-spinner"></div>
+
+      <h3>Loading Event Details...</h3>
+
+      <p>
+        Please wait while we retrieve event information.
+      </p>
+    </div>
+
+    <!-- ==================================
+         ERROR STATE - 404
+    =================================== -->
+
+    <div
+      v-else-if="isNotFound"
+      class="error-container"
+    >
+      <div class="error-icon">🔎</div>
+
+      <h2>404 - Event Not Found</h2>
+
+      <p>
+        The event you are looking for is unavailable
+        or has been removed by the organizer.
+      </p>
+
+      <button
+        class="btn-register"
+        @click="goBack"
+      >
+        Back to Event Catalog
+      </button>
+    </div>
+
+    <!-- ==================================
+         NETWORK ERROR
+    =================================== -->
+
+    <div
+      v-else-if="error && !event"
+      class="error-container"
+    >
+      <div class="error-icon">⚠️</div>
+
+      <h2>Unable to Load Event</h2>
+
+      <p>{{ error }}</p>
+
+      <button
+        class="btn-register"
+        @click="retryFetch"
+        :disabled="loading"
+      >
+        {{ loading ? 'Loading...' : 'Retry Loading' }}
+      </button>
+
+      <button
+        class="back-link"
+        @click="goBack"
+      >
+        Back to Event Catalog
+      </button>
+    </div>
+
+    <!-- ==================================
+         EVENT DETAIL
+    =================================== -->
+
+    <template v-else-if="event">
 
       <!-- BACK BUTTON -->
-      <button class="back-link" @click="goBack">
+
+      <button
+        class="back-link"
+        @click="goBack"
+      >
         ← Back to Events
       </button>
 
       <!-- EVENT HEADER -->
-      <div class="event-header">
+
+      <div class="detail-header">
 
         <div class="event-tags">
+
           <span class="category-badge">
             {{ event.cat }}
           </span>
 
           <span
-            :class="[
-              'status-badge',
-              event.done ? 'status-closed' : 'status-live'
-            ]"
+            v-if="event.done"
+            class="status-ended"
           >
-            {{ event.done ? 'Event Finished' : 'Event Open' }}
+            Event Finished
           </span>
+
+          <span
+            v-else-if="isSoldOut"
+            class="status-soldout"
+          >
+            Sold Out
+          </span>
+
+          <span
+            v-else
+            class="status-available"
+          >
+            Active
+          </span>
+
         </div>
 
         <h1>{{ event.title }}</h1>
 
         <div class="event-meta">
-          <span>📅 {{ event.date }}</span>
-          <span>{{ event.loc }}</span>
-          <span>👥 {{ event.quota }} seats remaining</span>
+
+          <span>
+            📅 {{ event.date }}
+          </span>
+
+          <span>
+            📍 {{ event.loc.replace(/^📍\s*/, '') }}
+          </span>
+
+          <span>
+            👥 {{ event.quota }} seats remaining
+          </span>
+
         </div>
 
       </div>
 
-      <!-- DETAIL CONTENT -->
-      <div class="detail-grid">
+      <!-- MAIN CONTENT -->
 
-        <!-- LEFT COLUMN -->
-        <section class="event-description-card">
+      <div class="detail-content">
+
+        <!-- EVENT DESCRIPTION -->
+
+        <section class="description-card">
 
           <h2>About This Event</h2>
 
@@ -120,72 +269,102 @@ const viewTicket = () => {
 
         </section>
 
-        <!-- RIGHT COLUMN -->
+        <!-- REGISTRATION CARD -->
+
         <aside class="registration-card">
 
           <h2>Event Registration</h2>
 
-          <!-- EVENT COMPLETED -->
-          <template v-if="event.done">
-            <p class="registration-info">
-              Registration is closed as this event
-              has concluded.
-            </p>
+          <div class="registration-info">
 
-            <button class="btn-disabled" disabled>
+            <div class="info-item">
+              <span>Event Category</span>
+              <strong>{{ event.cat }}</strong>
+            </div>
+
+            <div class="info-item">
+              <span>Available Seats</span>
+              <strong>{{ event.quota }}</strong>
+            </div>
+
+            <div class="info-item">
+              <span>Ticket Price</span>
+              <strong>{{ event.price || 'Free' }}</strong>
+            </div>
+
+          </div>
+
+          <!-- EVENT COMPLETED -->
+
+          <template v-if="event.done">
+
+            <button
+              class="btn-disabled"
+              disabled
+            >
               Registration Closed
             </button>
+
+            <p class="notice-text">
+              This event has already been completed.
+            </p>
+
           </template>
 
           <!-- ALREADY REGISTERED -->
-          <template v-else-if="isRegistered">
-            <p class="registration-info success-text">
-              You are registered for this event.
-              Your booking is confirmed.
-            </p>
 
-            <button class="btn-registered" disabled>
-              Already Registered
+          <template v-else-if="isRegistered">
+
+            <button
+              class="btn-registered"
+              disabled
+            >
+              ✓ Already Registered
             </button>
 
             <button
-              class="view-ticket-link"
-              @click="viewTicket"
+              class="btn-ticket"
+              @click="handleViewTicket"
             >
               View Ticket Receipt →
             </button>
+
           </template>
 
           <!-- SOLD OUT -->
-          <template v-else-if="isSoldOut">
-            <p class="registration-info">
-              All available seats for this event
-              have been booked.
-            </p>
 
-            <button class="btn-disabled" disabled>
+          <template v-else-if="isSoldOut">
+
+            <button
+              class="btn-disabled"
+              disabled
+            >
               Sold Out
             </button>
+
+            <p class="notice-text">
+              All available seats have been booked.
+            </p>
+
           </template>
 
-          <!-- AVAILABLE REGISTRATION -->
+          <!-- AVAILABLE -->
+
           <template v-else>
-            <p class="registration-info">
+
+            <button
+              class="btn-register"
+              @click="handleRegister"
+            >
+              Register Now →
+            </button>
+
+            <p class="notice-text">
               Secure your spot now before the
               remaining quota is filled.
             </p>
 
-            <button
-              class="btn-register"
-              @click="handleRegisterClick"
-            >
-              Register Now
-            </button>
           </template>
-
-          <div class="registration-footer">
-            {{ event.quota }} seats available
-          </div>
 
         </aside>
 
@@ -193,22 +372,16 @@ const viewTicket = () => {
 
     </template>
 
-    <!-- EVENT NOT FOUND -->
-    <div v-else class="not-found-card">
+    <!-- ==================================
+         FALLBACK
+    =================================== -->
 
-      <div class="not-found-icon">🔎</div>
-
-      <h2>404 - Event Not Found</h2>
-
-      <p>
-        The event you are looking for is unavailable
-        or has been removed by the organizer.
-      </p>
-
-      <button class="btn-register" @click="goBack">
-        Back to Event Catalog
-      </button>
-
+    <div
+      v-else
+      class="loading-container"
+    >
+      <div class="loading-spinner"></div>
+      <h3>Loading Event Details...</h3>
     </div>
 
   </div>
@@ -216,311 +389,360 @@ const viewTicket = () => {
 
 <style scoped>
 
-/* =====================================
+/* ==========================================
    EVENT DETAIL PAGE
-===================================== */
+========================================== */
 
 .event-detail-page {
   width: 100%;
   max-width: 1200px;
   margin: 0 auto;
-  padding: 32px;
-  color: #1c1948;
-  font-family: Inter, Arial, sans-serif;
+  padding: 24px 0;
+  color: var(--text-main, #1c1948);
 }
 
-/* =====================================
-   BACK LINK
-===================================== */
+/* ==========================================
+   BACK BUTTON
+========================================== */
 
 .back-link {
-  background: none;
+  display: inline-block;
   border: none;
-  color: #777789;
-  font-size: 12px;
+  background: transparent;
+  color: var(--primary, #6644ff);
+  font-size: 0.95rem;
   font-weight: 600;
   cursor: pointer;
-  padding: 0;
   margin-bottom: 24px;
 }
 
 .back-link:hover {
-  color: #6644ff;
+  text-decoration: underline;
 }
 
-/* =====================================
+/* ==========================================
    EVENT HEADER
-===================================== */
+========================================== */
 
-.event-header {
-  background: #f8f8fc;
-  border: 1px solid #ededf2;
-  border-radius: 14px;
-  padding: 30px;
-  margin-bottom: 28px;
+.detail-header {
+  margin-bottom: 35px;
 }
 
 .event-tags {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 10px;
   margin-bottom: 18px;
 }
 
 .category-badge {
-  background: #f0edff;
-  color: #6644ff;
-  padding: 7px 13px;
+  background: rgba(102, 68, 255, 0.1);
+  color: var(--primary, #6644ff);
+  padding: 7px 14px;
   border-radius: 20px;
-  font-size: 11px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.status-available,
+.status-soldout,
+.status-ended {
+  padding: 7px 14px;
+  border-radius: 20px;
+  font-size: 0.8rem;
   font-weight: 700;
 }
 
-.status-badge {
-  padding: 7px 13px;
-  border-radius: 20px;
-  font-size: 11px;
-  font-weight: 700;
-}
-
-.status-live {
+.status-available {
   background: #dcfce7;
-  color: #16a34a;
+  color: #15803d;
 }
 
-.status-closed {
+.status-soldout {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.status-ended {
   background: #f1f5f9;
   color: #64748b;
 }
 
-.event-header h1 {
-  color: #1c1948;
-  font-size: 30px;
+.detail-header h1 {
+  font-size: 2.5rem;
   font-weight: 800;
-  line-height: 1.3;
-  margin: 0 0 20px;
-  overflow-wrap: anywhere;
+  line-height: 1.2;
+  margin-bottom: 20px;
+  color: var(--text-main, #1c1948);
 }
 
 .event-meta {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
-  gap: 18px;
-  color: #777789;
-  font-size: 12px;
-  font-weight: 600;
+  gap: 16px;
+  color: var(--text-muted, #64748b);
+  font-size: 0.95rem;
 }
 
-/* =====================================
-   CONTENT GRID
-===================================== */
+/* ==========================================
+   DETAIL CONTENT
+========================================== */
 
-.detail-grid {
+.detail-content {
   display: grid;
-  grid-template-columns:
-    minmax(0, 1fr) 330px;
-  gap: 26px;
+  grid-template-columns: 2fr 1fr;
+  gap: 28px;
   align-items: start;
 }
 
-/* =====================================
-   EVENT DESCRIPTION
-===================================== */
+/* ==========================================
+   DESCRIPTION CARD
+========================================== */
 
-.event-description-card {
+.description-card,
+.registration-card {
   background: #ffffff;
-  border: 1px solid #e4e4e7;
-  border-radius: 12px;
-  padding: 27px;
-  min-height: 260px;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 28px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.03);
 }
 
-.event-description-card h2 {
-  color: #1c1948;
-  font-size: 19px;
-  font-weight: 800;
-  margin: 0 0 18px;
-  padding-left: 12px;
-  border-left: 4px solid #6644ff;
+.description-card h2,
+.registration-card h2 {
+  font-size: 1.35rem;
+  font-weight: 700;
+  margin-bottom: 22px;
+  color: var(--text-main, #1c1948);
 }
 
 .description-text {
-  color: #666677;
-  font-size: 13px;
-  line-height: 1.9;
-  white-space: pre-line;
-  overflow-wrap: anywhere;
+  color: var(--text-muted, #64748b);
+  line-height: 1.8;
+  font-size: 1rem;
 }
 
-/* =====================================
+/* ==========================================
    REGISTRATION CARD
-===================================== */
+========================================== */
 
 .registration-card {
-  background: #ffffff;
-  border: 1px solid #e4e4e7;
-  border-radius: 12px;
-  padding: 24px;
   position: sticky;
-  top: 24px;
-  box-shadow: 0 5px 20px rgba(25, 23, 67, 0.05);
-}
-
-.registration-card h2 {
-  color: #1c1948;
-  font-size: 18px;
-  font-weight: 800;
-  text-align: center;
-  margin: 0 0 15px;
+  top: 25px;
 }
 
 .registration-info {
-  color: #858592;
-  font-size: 12px;
-  line-height: 1.7;
-  text-align: center;
-  margin-bottom: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  margin-bottom: 25px;
 }
 
-.success-text {
-  color: #16a34a;
+.info-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #e2e8f0;
+  font-size: 0.9rem;
 }
 
-/* =====================================
-   REGISTRATION BUTTONS
-===================================== */
+.info-item span {
+  color: var(--text-muted, #64748b);
+}
+
+.info-item strong {
+  color: var(--text-main, #1c1948);
+  text-align: right;
+}
+
+/* ==========================================
+   BUTTONS
+========================================== */
 
 .btn-register,
+.btn-registered,
 .btn-disabled,
-.btn-registered {
+.btn-ticket {
   display: block;
   width: 100%;
   padding: 13px 18px;
-  border-radius: 8px;
-  font-family: inherit;
-  font-size: 12px;
+  border-radius: 9px;
+  font-size: 0.95rem;
   font-weight: 700;
+  cursor: pointer;
+  transition: 0.2s;
   text-align: center;
 }
 
 .btn-register {
-  background: #6644ff;
-  border: 1px solid #6644ff;
+  background: var(--primary, #6644ff);
   color: #ffffff;
-  cursor: pointer;
+  border: none;
   box-shadow: 0 5px 15px rgba(102, 68, 255, 0.2);
-  transition: 0.2s;
 }
 
 .btn-register:hover {
-  background: #5533ee;
-  transform: translateY(-1px);
-}
-
-.btn-disabled {
-  background: #e4e4e7;
-  border: 1px solid #e4e4e7;
-  color: #858592;
-  cursor: not-allowed;
+  background: var(--primary-hover, #5533ee);
+  transform: translateY(-2px);
 }
 
 .btn-registered {
   background: #dcfce7;
-  border: 1px solid #bbf7d0;
   color: #15803d;
+  border: 1px solid #bbf7d0;
   cursor: default;
 }
 
-.view-ticket-link {
-  display: block;
-  width: 100%;
+.btn-disabled {
+  background: #f1f5f9;
+  color: #94a3b8;
+  border: 1px solid #e2e8f0;
+  cursor: not-allowed;
+}
+
+.btn-ticket {
+  background: #ffffff;
+  color: var(--primary, #6644ff);
+  border: 1px solid var(--primary, #6644ff);
   margin-top: 12px;
-  padding: 8px;
-  border: none;
-  background: transparent;
-  color: #6644ff;
-  font-family: inherit;
-  font-size: 12px;
-  font-weight: 700;
-  text-decoration: underline;
-  cursor: pointer;
 }
 
-.registration-footer {
-  color: #9292a0;
-  font-size: 11px;
-  text-align: center;
-  margin-top: 18px;
+.btn-ticket:hover {
+  background: rgba(102, 68, 255, 0.08);
 }
 
-/* =====================================
-   EVENT NOT FOUND
-===================================== */
-
-.not-found-card {
-  background: white;
-  border: 1px solid #e4e4e7;
-  border-radius: 12px;
-  max-width: 500px;
-  padding: 40px;
-  margin: 40px auto;
+.notice-text {
+  color: var(--text-muted, #64748b);
+  font-size: 0.85rem;
+  line-height: 1.6;
+  margin-top: 15px;
   text-align: center;
 }
 
-.not-found-icon {
-  font-size: 42px;
+/* ==========================================
+   LOADING STATE
+========================================== */
+
+.loading-container {
+  max-width: 550px;
+  margin: 50px auto;
+  padding: 45px 30px;
+  text-align: center;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+}
+
+.loading-spinner {
+  width: 42px;
+  height: 42px;
+  border: 4px solid #e2e8f0;
+  border-top-color: #6644ff;
+  border-radius: 50%;
+  margin: 0 auto 20px;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.loading-container h3 {
+  color: var(--text-main, #1c1948);
+  margin-bottom: 10px;
+}
+
+.loading-container p {
+  color: var(--text-muted, #64748b);
+  font-size: 0.9rem;
+}
+
+/* ==========================================
+   ERROR STATE
+========================================== */
+
+.error-container {
+  max-width: 550px;
+  margin: 50px auto;
+  padding: 40px 30px;
+  text-align: center;
+  background: #fff5f5;
+  border: 1px solid #fecaca;
+  border-radius: 14px;
+}
+
+.error-icon {
+  font-size: 3rem;
   margin-bottom: 15px;
 }
 
-.not-found-card h2 {
-  font-size: 22px;
-  color: #1c1948;
+.error-container h2 {
+  color: #dc2626;
+  font-size: 1.4rem;
   margin-bottom: 12px;
 }
 
-.not-found-card p {
-  color: #858592;
-  font-size: 13px;
+.error-container p {
+  color: #64748b;
   line-height: 1.7;
-  margin-bottom: 20px;
+  margin-bottom: 22px;
 }
 
-/* =====================================
-   RESPONSIVE
-===================================== */
+.error-container .back-link {
+  display: block;
+  margin: 15px auto 0;
+}
 
-@media (max-width: 900px) {
-  .detail-grid {
+.btn-register:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ==========================================
+   RESPONSIVE
+========================================== */
+
+@media (max-width: 768px) {
+
+  .event-detail-page {
+    padding: 20px 0;
+  }
+
+  .detail-header h1 {
+    font-size: 1.8rem;
+  }
+
+  .detail-content {
     grid-template-columns: 1fr;
   }
 
   .registration-card {
     position: static;
   }
-}
-
-@media (max-width: 600px) {
-  .event-detail-page {
-    padding: 20px 15px;
-  }
-
-  .event-header {
-    padding: 22px;
-  }
-
-  .event-header h1 {
-    font-size: 23px;
-  }
-
-  .event-description-card {
-    padding: 20px;
-  }
 
   .event-meta {
     flex-direction: column;
-    align-items: flex-start;
     gap: 10px;
   }
+
 }
+
+@media (max-width: 480px) {
+
+  .detail-header h1 {
+    font-size: 1.55rem;
+  }
+
+  .description-card,
+  .registration-card {
+    padding: 20px;
+  }
+
+}
+
 </style>
