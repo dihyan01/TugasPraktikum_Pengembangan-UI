@@ -1,6 +1,6 @@
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 
 import RegistrationSummary from '@/components/event/RegistrationSummary.vue'
@@ -10,65 +10,59 @@ import RegistrationReceipt from '@/components/event/RegistrationReceipt.vue'
 import { useEvents } from '@/composables/useEvents'
 
 // ==========================================
-// MODUL 5 - EVENT REGISTRATION
+// MODUL 6 - EVENT REGISTRATION
 // ==========================================
 
-// VUE ROUTER
 const router = useRouter()
 const route = useRoute()
 
-// CENTRALIZED STATE
 const {
   events,
   userRegistrations,
   getEventById,
+  fetchEventById,
   registerAttendee
 } = useEvents()
 
 // ==========================================
-// CURRENT EVENT DATA
+// EVENT DATA
 // ==========================================
 
-// Mengambil ID event dari URL
-const eventId = computed(() => {
-  return Number(route.params.id)
+const eventId = computed(() => String(route.params.id || ''))
+
+const event = computed(() => {
+  return events.value.find(
+    item => String(item.id) === eventId.value
+  ) || getEventById(eventId.value)
 })
 
-// Mengambil event dari useEvents.js
-const event = computed(() => {
-  // Membaca events agar tetap reaktif
-  return events.value.find(
-    item => item.id === eventId.value
-  ) || getEventById(eventId.value)
+onMounted(async () => {
+  if (eventId.value && !event.value) {
+    await fetchEventById(eventId.value)
+  }
 })
 
 // ==========================================
 // REGISTRATION STATUS
 // ==========================================
 
-// Memeriksa apakah sudah terdaftar
 const isRegistered = computed(() => {
   return userRegistrations.value.some(
     registration =>
-      registration.eventId === eventId.value
+      String(registration.eventId) === eventId.value
   )
 })
 
-// Memeriksa kuota
 const isSoldOut = computed(() => {
   return event.value
     ? Number(event.value.quota) <= 0
     : false
 })
 
-// Memeriksa apakah event selesai
 const isEventCompleted = computed(() => {
-  return event.value
-    ? event.value.done === true
-    : false
+  return event.value?.done === true
 })
 
-// Memastikan pendaftaran diperbolehkan
 const canRegister = computed(() => {
   return Boolean(
     event.value &&
@@ -79,28 +73,23 @@ const canRegister = computed(() => {
 })
 
 // ==========================================
-// REGISTRATION CONFIRMATION STATE
+// REGISTRATION STATE
 // ==========================================
 
 const confirmedData = ref(null)
-const isSuccessModalOpen = ref(false)
 const registrationError = ref('')
 const isSubmitting = ref(false)
 
 // ==========================================
-// HANDLE REGISTRATION SUCCESS
+// HANDLE REGISTRATION
 // ==========================================
 
-const handleRegistrationSuccess = (formData) => {
+const handleRegistrationSuccess = async (formData) => {
+
+  if (isSubmitting.value) return
 
   registrationError.value = ''
 
-  // Mencegah submit berulang
-  if (isSubmitting.value) {
-    return
-  }
-
-  // Memastikan event tersedia
   if (!canRegister.value) {
     registrationError.value =
       'Registration is not available for this event.'
@@ -110,716 +99,371 @@ const handleRegistrationSuccess = (formData) => {
   isSubmitting.value = true
 
   try {
-    // Simpan data pendaftaran
-    const record = registerAttendee(
+
+    const record = await registerAttendee(
       eventId.value,
       formData
     )
 
     if (record) {
-      // Simpan hasil registrasi
+
+      // Simpan hasil registrasi untuk receipt
       confirmedData.value = record
 
-      // Tampilkan modal sukses
-      isSuccessModalOpen.value = true
     } else {
+
       registrationError.value =
-        'Unable to complete registration. Please check event availability.'
+        'Unable to complete registration. Please try again.'
+
     }
+
   } catch (error) {
-    console.error('Registration error:', error)
+
+    console.error('Registration Error:', error)
 
     registrationError.value =
-      'Something went wrong. Please try again.'
+      error.message || 'Something went wrong.'
+
   } finally {
+
     isSubmitting.value = false
+
   }
 }
 
 // ==========================================
-// NAVIGATION HANDLERS
+// NAVIGATION
 // ==========================================
 
-// Kembali ke detail event
 const handleBackToDetail = () => {
   router.push(`/browse/events/${eventId.value}`)
 }
 
-// Kembali ke katalog event
-const handleBackToCatalog = () => {
-  isSuccessModalOpen.value = false
-  router.push('/browse/events')
-}
-
-// Menuju halaman Your Events
 const handleGoToYourEvents = () => {
-  isSuccessModalOpen.value = false
   router.push('/browse/your-events')
 }
 
-// Menuju tiket peserta
-const handleViewTicket = () => {
-  isSuccessModalOpen.value = false
-  router.push(`/browse/your-events/${eventId.value}`)
+const handleBackToCatalog = () => {
+  router.push('/browse/events')
 }
 </script>
 
 <template>
   <div class="registration-page">
 
-    <!-- =====================================
-         EVENT NOT FOUND
-    ====================================== -->
-
-    <div
-      v-if="!event"
-      class="notice-container"
-    >
-      <div class="notice-card">
-        <div class="notice-icon">🔎</div>
-
-        <h2>Event Not Found</h2>
-
-        <p>
-          The event you are looking for is
-          unavailable or has been removed.
-        </p>
-
-        <button
-          class="btn-primary"
-          @click="handleBackToCatalog"
-        >
-          Back to Event Catalog
-        </button>
-      </div>
-    </div>
-
-    <!-- =====================================
-         ALREADY REGISTERED
-    ====================================== -->
-
-    <div
-      v-else-if="isRegistered && !isSuccessModalOpen"
-      class="notice-container"
-    >
-      <div class="notice-card">
-        <div class="notice-icon">🎟️</div>
-
-        <span class="notice-badge badge-success">
-          REGISTERED
-        </span>
-
-        <h2>You're Already Registered!</h2>
-
-        <p>
-          You have already secured a ticket for
-          <strong>{{ event.title }}</strong>.
-          You can view your registration details
-          from Your Events.
-        </p>
-
-        <div class="notice-actions">
-          <button
-            class="btn-secondary"
-            @click="handleBackToDetail"
-          >
-            Back to Event Details
-          </button>
-
-          <button
-            class="btn-primary"
-            @click="handleViewTicket"
-          >
-            View My Ticket →
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- =====================================
-         EVENT COMPLETED / SOLD OUT
-    ====================================== -->
-
-    <div
-      v-else-if="isEventCompleted || isSoldOut"
-      class="notice-container"
-    >
-      <div class="notice-card">
-        <div class="notice-icon">
-          {{ isEventCompleted ? '🔒' : '🎫' }}
-        </div>
-
-        <h2>
-          {{ isEventCompleted
-            ? 'Registration Closed'
-            : 'Event Sold Out' }}
-        </h2>
-
-        <p>
-          {{ isEventCompleted
-            ? 'Registration for this event has been closed.'
-            : 'Sorry, all available seats for this event have been booked.' }}
-        </p>
-
-        <button
-          class="btn-primary"
-          @click="handleBackToCatalog"
-        >
-          Browse Other Events
-        </button>
-      </div>
-    </div>
-
-    <!-- =====================================
-         REGISTRATION PAGE
-    ====================================== -->
-
-    <template v-else>
+    <div v-if="event" class="registration-container">
 
       <!-- PAGE HEADER -->
-      <div class="registration-page-header">
 
-        <button
-          type="button"
-          class="back-link"
-          @click="handleBackToDetail"
-        >
-          ← Back to Event Detail
-        </button>
-
-        <div class="header-text">
-          <span class="eyebrow">
-            EVENT REGISTRATION
-          </span>
-
-          <h1>Complete Your Registration</h1>
-
-          <p>
-            You're one step away from joining this event.
-            Please complete your information below.
-          </p>
-        </div>
-      </div>
-
-      <!-- REGISTRATION ERROR -->
-      <div
-        v-if="registrationError"
-        class="registration-alert"
-        role="alert"
+      <button
+        type="button"
+        class="back-button"
+        @click="handleBackToDetail"
       >
-        ⚠️ {{ registrationError }}
-      </div>
+        ← Back to Event Details
+      </button>
 
-      <!-- TWO COLUMN LAYOUT -->
-      <div class="registration-grid">
+      <div class="registration-header">
 
-        <!-- LEFT: EVENT SUMMARY -->
-        <div class="summary-column">
-          <RegistrationSummary
-            :event="event"
-          />
-        </div>
+        <h1>
+          {{ confirmedData
+            ? 'Registration Confirmed'
+            : 'Complete Your Registration' }}
+        </h1>
 
-        <!-- RIGHT: REGISTRATION FORM -->
-        <div class="form-column">
-          <RegistrationForm
-            @submit="handleRegistrationSuccess"
-            @cancel="handleBackToDetail"
-          />
-        </div>
+        <p>
+          {{ confirmedData
+            ? 'Your event registration has been successfully completed.'
+            : 'Fill in your information to secure your spot.' }}
+        </p>
 
       </div>
 
-    </template>
+      <div class="registration-content">
 
-    <!-- =====================================
-         SUCCESS CONFIRMATION MODAL
-    ====================================== -->
+        <!-- EVENT SUMMARY -->
 
-    <Teleport to="body">
+        <RegistrationSummary
+          :event="event"
+        />
 
-      <Transition name="modal-fade">
+        <div class="registration-form-wrapper">
 
-        <div
-          v-if="isSuccessModalOpen && confirmedData && event"
-          class="success-modal-overlay"
-        >
+          <!-- SUCCESS: SHOW RECEIPT -->
 
-          <div
-            class="success-modal-card"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="success-modal-title"
-          >
+          <div v-if="confirmedData" class="success-section">
 
-            <!-- MODAL HEADER -->
-            <div class="success-modal-header">
+            <div class="success-icon">✓</div>
 
-              <div class="success-icon">
-                ✓
-              </div>
+            <h2>Registration Confirmed!</h2>
 
-              <div class="success-header-text">
-                <span class="success-label">
-                  SUCCESS
-                </span>
+            <p>
+              Your registration has been successfully completed.
+            </p>
 
-                <h2 id="success-modal-title">
-                  Registration Confirmed
-                </h2>
-              </div>
+            <RegistrationReceipt
+              :confirmed-data="confirmedData"
+              :event="event"
+            />
 
-            </div>
-
-            <!-- MODAL BODY -->
-            <div class="success-modal-body">
-
-              <RegistrationReceipt
-                :confirmed-data="confirmedData"
-                :event="event"
-              />
-
-            </div>
-
-            <!-- MODAL FOOTER -->
-            <div class="success-modal-footer">
+            <div class="success-actions">
 
               <button
                 type="button"
-                class="btn-secondary"
-                @click="handleBackToCatalog"
+                class="primary-button"
+                @click="handleGoToYourEvents"
               >
-                Back to Event Catalog
+                View My Events →
               </button>
 
               <button
                 type="button"
-                class="btn-primary"
-                @click="handleGoToYourEvents"
+                class="secondary-button"
+                @click="handleBackToCatalog"
               >
-                Go to Your Events →
+                Browse More Events
               </button>
 
             </div>
 
           </div>
 
+          <!-- ALREADY REGISTERED BEFORE THIS SESSION -->
+
+          <div
+            v-else-if="isRegistered"
+            class="notice-box"
+          >
+            <h3>You have already registered for this event.</h3>
+
+            <p>
+              You can view your booking details in Your Events.
+            </p>
+
+            <button
+              type="button"
+              class="primary-button"
+              @click="handleGoToYourEvents"
+            >
+              View My Events →
+            </button>
+          </div>
+
+          <!-- EVENT COMPLETED -->
+
+          <div
+            v-else-if="isEventCompleted"
+            class="notice-box"
+          >
+            This event has already been completed.
+          </div>
+
+          <!-- SOLD OUT -->
+
+          <div
+            v-else-if="isSoldOut"
+            class="notice-box"
+          >
+            Sorry, this event is fully booked.
+          </div>
+
+          <!-- REGISTRATION FORM -->
+
+          <RegistrationForm
+            v-else
+            @submit="handleRegistrationSuccess"
+            @cancel="handleBackToDetail"
+          />
+
+          <!-- ERROR MESSAGE -->
+
+          <p
+            v-if="registrationError"
+            class="error-message"
+          >
+            {{ registrationError }}
+          </p>
+
         </div>
 
-      </Transition>
+      </div>
 
-    </Teleport>
+    </div>
+
+    <div v-else class="loading-state">
+      <p>Loading event information...</p>
+    </div>
 
   </div>
 </template>
 
 <style scoped>
-
-/* ==========================================
-   EVENT REGISTRATION PAGE
-========================================== */
-
 .registration-page {
   width: 100%;
-  max-width: 1200px;
   min-height: 70vh;
-  margin: 0 auto;
-  padding: 36px 32px 70px;
   color: #1c1948;
-  font-family: Inter, Arial, sans-serif;
-  box-sizing: border-box;
 }
 
-/* ==========================================
-   PAGE HEADER
-========================================== */
+.registration-container {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 24px 20px 50px;
+}
 
-.registration-page-header {
+.back-button {
+  background: transparent;
+  border: none;
+  color: #6644ff;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  margin-bottom: 28px;
+}
+
+.back-button:hover {
+  color: #5533ee;
+}
+
+.registration-header {
   margin-bottom: 30px;
 }
 
-.back-link {
-  display: inline-flex;
-  align-items: center;
-  background: transparent;
-  border: none;
-  padding: 0;
-  margin-bottom: 24px;
-  color: #777789;
-  font-family: inherit;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: color 0.2s ease;
-}
-
-.back-link:hover {
-  color: #6644ff;
-}
-
-.header-text {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 8px;
-}
-
-.eyebrow {
-  color: #6644ff;
-  font-size: 11px;
+.registration-header h1 {
+  font-size: 2rem;
   font-weight: 800;
-  letter-spacing: 1px;
-}
-
-.header-text h1 {
+  margin: 0 0 10px;
   color: #1c1948;
-  font-size: 28px;
-  line-height: 1.3;
-  font-weight: 800;
+}
+
+.registration-header p {
+  color: #64748b;
+  font-size: 1rem;
   margin: 0;
 }
 
-.header-text p {
-  color: #858592;
-  font-size: 13px;
-  line-height: 1.7;
-  margin: 0;
-}
-
-/* ==========================================
-   TWO COLUMN LAYOUT
-========================================== */
-
-.registration-grid {
+.registration-content {
   display: grid;
-  grid-template-columns:
-    minmax(280px, 350px)
-    minmax(0, 1fr);
-  gap: 28px;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  gap: 30px;
   align-items: start;
 }
 
-.summary-column,
-.form-column {
-  min-width: 0;
-}
-
-/* ==========================================
-   ERROR ALERT
-========================================== */
-
-.registration-alert {
-  padding: 14px 18px;
-  background: #fee2e2;
-  color: #b91c1c;
-  border: 1px solid #fecaca;
-  border-radius: 9px;
-  font-size: 12px;
-  font-weight: 600;
-  margin-bottom: 22px;
-}
-
-/* ==========================================
-   NOTICE STATES
-========================================== */
-
-.notice-container {
-  display: flex;
-  justify-content: center;
-  align-items: flex-start;
-  padding: 50px 0;
-}
-
-.notice-card {
-  width: 100%;
-  max-width: 530px;
+.registration-form-wrapper {
   background: #ffffff;
-  border: 1px solid #e4e4e7;
+  border: 1px solid #e2e8f0;
   border-radius: 14px;
-  padding: 45px 30px;
-  box-shadow: 0 8px 30px rgba(25, 23, 67, 0.05);
+  padding: 24px;
+  box-shadow: 0 5px 20px rgba(25, 23, 67, 0.04);
+}
+
+.success-section {
   text-align: center;
 }
 
-.notice-icon {
-  font-size: 45px;
-  margin-bottom: 18px;
-}
-
-.notice-card h2 {
-  color: #1c1948;
-  font-size: 23px;
-  font-weight: 800;
-  margin: 0 0 12px;
-}
-
-.notice-card p {
-  color: #858592;
-  font-size: 13px;
-  line-height: 1.8;
-  margin: 0 0 25px;
-}
-
-.notice-card p strong {
-  color: #1c1948;
-}
-
-.notice-badge {
-  display: inline-block;
-  padding: 6px 12px;
-  border-radius: 20px;
-  font-size: 10px;
-  font-weight: 800;
-  margin-bottom: 15px;
-}
-
-.badge-success {
-  background: #dcfce7;
-  color: #15803d;
-}
-
-.notice-actions {
-  display: flex;
-  justify-content: center;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-/* ==========================================
-   BUTTONS
-========================================== */
-
-.btn-primary,
-.btn-secondary {
-  display: inline-flex;
-  justify-content: center;
-  align-items: center;
-  gap: 8px;
-  padding: 12px 20px;
-  border-radius: 8px;
-  font-family: inherit;
-  font-size: 12px;
-  font-weight: 700;
-  line-height: 1.4;
-  cursor: pointer;
-  transition: 0.2s ease;
-}
-
-.btn-primary {
-  background: #6644ff;
-  border: 1px solid #6644ff;
-  color: #ffffff;
-  box-shadow: 0 5px 15px rgba(102, 68, 255, 0.2);
-}
-
-.btn-primary:hover {
-  background: #5533ee;
-  border-color: #5533ee;
-  transform: translateY(-1px);
-}
-
-.btn-secondary {
-  background: #ffffff;
-  border: 1px solid #e4e4e7;
-  color: #555566;
-}
-
-.btn-secondary:hover {
-  background: #f4f4f5;
-}
-
-/* ==========================================
-   SUCCESS MODAL OVERLAY
-========================================== */
-
-.success-modal-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 9999;
-  background: rgba(15, 23, 42, 0.55);
-  backdrop-filter: blur(8px);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  padding: 20px;
-}
-
-/* ==========================================
-   SUCCESS MODAL CARD
-========================================== */
-
-.success-modal-card {
-  background: #ffffff;
-  width: 100%;
-  max-width: 520px;
-  max-height: calc(100vh - 40px);
-  overflow-y: auto;
-  border-radius: 16px;
-  padding: 28px;
-  box-shadow: 0 25px 70px rgba(0, 0, 0, 0.2);
-  font-family: Inter, Arial, sans-serif;
-}
-
-/* ==========================================
-   SUCCESS MODAL HEADER
-========================================== */
-
-.success-modal-header {
-  display: flex;
-  align-items: center;
-  gap: 13px;
-  margin-bottom: 10px;
-}
-
 .success-icon {
-  width: 44px;
-  height: 44px;
-  flex-shrink: 0;
-  display: flex;
-  justify-content: center;
-  align-items: center;
+  width: 55px;
+  height: 55px;
   border-radius: 50%;
   background: #dcfce7;
   color: #16a34a;
-  font-size: 24px;
+  font-size: 30px;
   font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 16px;
 }
 
-.success-header-text {
+.success-section h2 {
+  color: #1c1948;
+  font-size: 22px;
+  font-weight: 800;
+  margin: 0 0 8px;
+}
+
+.success-section > p {
+  color: #64748b;
+  font-size: 13px;
+  margin-bottom: 22px;
+}
+
+.success-actions {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 12px;
+  margin-top: 24px;
 }
 
-.success-label {
-  color: #15803d;
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 0.8px;
+.primary-button,
+.secondary-button {
+  padding: 13px 18px;
+  border-radius: 9px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
 }
 
-.success-header-text h2 {
+.primary-button {
+  background: #6644ff;
+  color: #ffffff;
+  border: 1px solid #6644ff;
+}
+
+.primary-button:hover {
+  background: #5533ee;
+}
+
+.secondary-button {
+  background: #ffffff;
+  color: #6644ff;
+  border: 1px solid #6644ff;
+}
+
+.notice-box {
+  padding: 20px;
+  border-radius: 10px;
+  background: #f5f3ff;
   color: #1c1948;
-  font-size: 21px;
-  font-weight: 800;
-  line-height: 1.3;
-  margin: 0;
+  line-height: 1.7;
 }
 
-/* ==========================================
-   SUCCESS MODAL BODY
-========================================== */
-
-.success-modal-body {
-  padding: 8px 0 22px;
+.notice-box h3 {
+  font-size: 15px;
+  margin: 0 0 8px;
 }
 
-/* ==========================================
-   SUCCESS MODAL FOOTER
-========================================== */
-
-.success-modal-footer {
-  border-top: 1px solid #eeeeF3;
-  padding-top: 20px;
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  flex-wrap: wrap;
+.notice-box p {
+  font-size: 13px;
+  color: #64748b;
 }
 
-/* ==========================================
-   MODAL TRANSITION
-========================================== */
-
-.modal-fade-enter-active,
-.modal-fade-leave-active {
-  transition:
-    opacity 0.25s ease;
+.notice-box button {
+  margin-top: 12px;
 }
 
-.modal-fade-enter-active .success-modal-card,
-.modal-fade-leave-active .success-modal-card {
-  transition:
-    transform 0.25s ease;
+.error-message {
+  color: #dc2626;
+  font-size: 13px;
+  margin-top: 15px;
 }
 
-.modal-fade-enter-from,
-.modal-fade-leave-to {
-  opacity: 0;
+.loading-state {
+  text-align: center;
+  padding: 80px 20px;
+  color: #64748b;
 }
 
-.modal-fade-enter-from .success-modal-card,
-.modal-fade-leave-to .success-modal-card {
-  transform: translateY(12px) scale(0.97);
-}
-
-/* ==========================================
-   RESPONSIVE TABLET
-========================================== */
-
-@media (max-width: 900px) {
-  .registration-page {
-    padding: 28px 20px 55px;
-  }
-
-  .registration-grid {
+@media (max-width: 768px) {
+  .registration-content {
     grid-template-columns: 1fr;
-    gap: 24px;
   }
 
-  .summary-column,
-  .form-column {
-    width: 100%;
-  }
-}
-
-/* ==========================================
-   RESPONSIVE MOBILE
-========================================== */
-
-@media (max-width: 550px) {
-  .registration-page {
-    padding: 22px 15px 40px;
+  .registration-header h1 {
+    font-size: 1.6rem;
   }
 
-  .header-text h1 {
-    font-size: 23px;
-  }
-
-  .header-text p {
-    font-size: 12px;
-  }
-
-  .notice-card {
-    padding: 30px 20px;
-  }
-
-  .notice-card h2 {
-    font-size: 20px;
-  }
-
-  .success-modal-card {
-    padding: 22px 18px;
-  }
-
-  .success-header-text h2 {
-    font-size: 18px;
-  }
-
-  .success-modal-footer {
-    flex-direction: column;
-  }
-
-  .success-modal-footer button {
-    width: 100%;
-  }
-
-  .notice-actions {
-    flex-direction: column;
-  }
-
-  .notice-actions button {
-    width: 100%;
+  .registration-container {
+    padding: 20px 16px 40px;
   }
 }
 </style>

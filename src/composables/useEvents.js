@@ -2,58 +2,60 @@
 import { ref, computed, watch } from 'vue'
 
 // ==========================================
-// MODUL 5 - CENTRALIZED STATE MANAGEMENT
+// MODUL 6 - REST API & CENTRALIZED STATE
 // Gatherly Event & Registration System
 // ==========================================
 
-// ==========================================
-// 1. LOCAL STORAGE KEYS
-// ==========================================
-
-const EVENTS_STORAGE_KEY = 'gatherly_events'
+// 1. STORAGE KEYS
 const REGISTRATIONS_STORAGE_KEY = 'gatherly_user_registrations'
 
 // ==========================================
-// 2. INITIAL STATE
+// 2. API CONFIGURATION
 // ==========================================
 
-// Data event awal sengaja kosong
-const defaultEvents = []
+const getApiBaseUrl = () => {
+  const baseUrl = import.meta.env.VITE_API_URL
 
-// Membaca data yang sebelumnya tersimpan
-const savedEvents = localStorage.getItem(EVENTS_STORAGE_KEY)
-const savedRegistrations = localStorage.getItem(
-  REGISTRATIONS_STORAGE_KEY
-)
+  if (!baseUrl) {
+    throw new Error('API URL belum dikonfigurasi di file .env')
+  }
 
-// SINGLE SOURCE OF TRUTH
-// Diletakkan di luar fungsi agar digunakan bersama
+  return baseUrl.replace(/\/$/, '')
+}
 
-const events = ref(
-  savedEvents ? JSON.parse(savedEvents) : defaultEvents
-)
-
-const userRegistrations = ref(
-  savedRegistrations ? JSON.parse(savedRegistrations) : []
-)
+const getApiUrl = (endpoint = '') => {
+  return `${getApiBaseUrl()}/events${endpoint}`
+}
 
 // ==========================================
-// 3. LOCAL STORAGE WATCHERS
+// 3. INITIAL STATE
 // ==========================================
 
-// Menyimpan perubahan event
-watch(
-  events,
-  (newEvents) => {
-    localStorage.setItem(
-      EVENTS_STORAGE_KEY,
-      JSON.stringify(newEvents)
-    )
-  },
-  { deep: true }
-)
+const events = ref([])
 
-// Menyimpan perubahan registrasi peserta
+const loadSavedRegistrations = () => {
+  try {
+    const saved = localStorage.getItem(REGISTRATIONS_STORAGE_KEY)
+    return saved ? JSON.parse(saved) : []
+  } catch (err) {
+    console.error('Gagal membaca data registrasi:', err)
+    return []
+  }
+}
+
+const userRegistrations = ref(loadSavedRegistrations())
+
+// ==========================================
+// 4. ASYNC STATUS
+// ==========================================
+
+const loading = ref(false)
+const error = ref(null)
+
+// ==========================================
+// 5. REGISTRATION WATCHER
+// ==========================================
+
 watch(
   userRegistrations,
   (newRegistrations) => {
@@ -66,7 +68,34 @@ watch(
 )
 
 // ==========================================
-// 4. COMPOSABLE
+// 6. NORMALIZE API DATA
+// ==========================================
+
+const normalizeEvent = (event) => ({
+  ...event,
+
+  id: String(event.id),
+
+  title: event.title || '',
+  date: event.date || '',
+
+  loc: event.loc
+    ? (
+        String(event.loc).startsWith('📍 ')
+          ? event.loc
+          : `📍 ${event.loc}`
+      )
+    : '',
+
+  cat: event.cat || '',
+  quota: Number(event.quota) || 0,
+  price: event.price || 'Free',
+  desc: event.desc || '',
+  done: Boolean(event.done)
+})
+
+// ==========================================
+// 7. COMPOSABLE
 // ==========================================
 
 export function useEvents() {
@@ -75,104 +104,320 @@ export function useEvents() {
   // DERIVED STATE
   // ========================================
 
-  const totalEvents = computed(() => {
-    return events.value.length
-  })
+  const totalEvents = computed(() => events.value.length)
 
-  const activeEvents = computed(() => {
-    return events.value.filter(event => !event.done)
-  })
+  const activeEvents = computed(() =>
+    events.value.filter(event => !event.done)
+  )
 
-  const completedEvents = computed(() => {
-    return events.value.filter(event => event.done)
-  })
+  const completedEvents = computed(() =>
+    events.value.filter(event => event.done)
+  )
 
-  const totalRegistrations = computed(() => {
-    return userRegistrations.value.length
-  })
+  const totalRegistrations = computed(() =>
+    userRegistrations.value.length
+  )
 
   // ========================================
-  // CREATE EVENT
+  // GET: FETCH ALL EVENTS
   // ========================================
 
-  const createEvent = (eventData) => {
+  const fetchEvents = async () => {
+    loading.value = true
+    error.value = null
 
-    const newEvent = {
-      id: Date.now(),
+    try {
+      const response = await fetch(getApiUrl())
 
-      title: eventData.title,
+      if (!response.ok) {
+        throw new Error(
+          `Gagal mengambil data event (HTTP ${response.status})`
+        )
+      }
 
-      date: eventData.date,
+      const data = await response.json()
 
-      loc: eventData.loc.startsWith('📍 ')
-        ? eventData.loc
-        : `📍 ${eventData.loc}`,
+      if (!Array.isArray(data)) {
+        throw new Error('Format data event dari API tidak valid.')
+      }
 
-      cat: eventData.cat,
+      events.value = data.map(normalizeEvent)
 
-      quota: Number(eventData.quota) || 100,
+      return events.value
 
-      price: eventData.price || 'Free',
+    } catch (err) {
+      error.value = err.message || 'Gagal mengambil data event'
+      console.error('Fetch Events Error:', err)
 
-      desc: eventData.desc,
+      return null
 
-      done: false
+    } finally {
+      loading.value = false
+    }
+  }
+
+  // ========================================
+  // GET: FETCH EVENT BY ID
+  // ========================================
+
+  const fetchEventById = async (id) => {
+    const eventId = String(id)
+
+    const existingEvent = getEventById(eventId)
+
+    if (existingEvent) {
+      return existingEvent
     }
 
-    events.value.unshift(newEvent)
+    loading.value = true
+    error.value = null
 
-    return newEvent
+    try {
+      const response = await fetch(
+        getApiUrl(`/${encodeURIComponent(eventId)}`)
+      )
+
+      if (response.status === 404) {
+        throw new Error('Event tidak ditemukan di server.')
+      }
+
+      if (!response.ok) {
+        throw new Error(
+          `Gagal mengambil detail event (HTTP ${response.status})`
+        )
+      }
+
+      const data = normalizeEvent(await response.json())
+
+      const index = events.value.findIndex(
+        event => String(event.id) === eventId
+      )
+
+      if (index === -1) {
+        events.value.push(data)
+      } else {
+        events.value[index] = data
+      }
+
+      return data
+
+    } catch (err) {
+      error.value = err.message || 'Gagal mengambil detail event'
+      console.error('Fetch Event By ID Error:', err)
+
+      return null
+
+    } finally {
+      loading.value = false
+    }
+  }
+
+  // ========================================
+  // POST: CREATE EVENT
+  // ========================================
+
+  const createEvent = async (eventData) => {
+    loading.value = true
+    error.value = null
+
+    try {
+      const newEventData = {
+        title: eventData.title,
+        date: eventData.date,
+
+        loc: String(eventData.loc || '')
+          .replace(/^📍\s*/, ''),
+
+        cat: eventData.cat,
+        quota: Number(eventData.quota) || 100,
+        price: eventData.price || 'Free',
+        desc: eventData.desc || '',
+        done: false
+      }
+
+      const response = await fetch(getApiUrl(), {
+        method: 'POST',
+
+        headers: {
+          'Content-Type': 'application/json'
+        },
+
+        body: JSON.stringify(newEventData)
+      })
+
+      if (!response.ok) {
+        throw new Error(
+          `Gagal membuat event (HTTP ${response.status})`
+        )
+      }
+
+      const savedEvent = normalizeEvent(
+        await response.json()
+      )
+
+      events.value.unshift(savedEvent)
+
+      return savedEvent
+
+    } catch (err) {
+      error.value = err.message || 'Gagal menyimpan event'
+      console.error('Create Event Error:', err)
+
+      return null
+
+    } finally {
+      loading.value = false
+    }
+  }
+
+  // ========================================
+  // DELETE: REMOVE EVENT
+  // ========================================
+
+  const deleteEvent = async (id) => {
+    const eventId = String(id)
+
+    loading.value = true
+    error.value = null
+
+    try {
+      const response = await fetch(
+        getApiUrl(`/${encodeURIComponent(eventId)}`),
+        {
+          method: 'DELETE'
+        }
+      )
+
+      if (!response.ok) {
+        throw new Error(
+          `Gagal menghapus event (HTTP ${response.status})`
+        )
+      }
+
+      events.value = events.value.filter(
+        event => String(event.id) !== eventId
+      )
+
+      userRegistrations.value =
+        userRegistrations.value.filter(
+          registration =>
+            String(registration.eventId) !== eventId
+        )
+
+      return true
+
+    } catch (err) {
+      error.value = err.message || 'Gagal menghapus event'
+      console.error('Delete Event Error:', err)
+
+      return false
+
+    } finally {
+      loading.value = false
+    }
+  }
+
+  // ========================================
+  // PUT: UPDATE EVENT
+  // ========================================
+
+  const updateEvent = async (id, updates) => {
+    const eventId = String(id)
+
+    let target = getEventById(eventId)
+
+    if (!target) {
+      target = await fetchEventById(eventId)
+    }
+
+    if (!target) return false
+
+    loading.value = true
+    error.value = null
+
+    try {
+      const updatedData = {
+        title: updates.title ?? target.title,
+        date: updates.date ?? target.date,
+
+        loc: String(
+          updates.loc ?? target.loc ?? ''
+        ).replace(/^📍\s*/, ''),
+
+        cat: updates.cat ?? target.cat,
+
+        quota: Number(
+          updates.quota ?? target.quota
+        ),
+
+        price: updates.price ?? target.price,
+        desc: updates.desc ?? target.desc,
+        done: updates.done ?? target.done
+      }
+
+      const response = await fetch(
+        getApiUrl(`/${encodeURIComponent(eventId)}`),
+        {
+          method: 'PUT',
+
+          headers: {
+            'Content-Type': 'application/json'
+          },
+
+          body: JSON.stringify(updatedData)
+        }
+      )
+
+      if (!response.ok) {
+        throw new Error(
+          `Gagal memperbarui event (HTTP ${response.status})`
+        )
+      }
+
+      const savedEvent = normalizeEvent(
+        await response.json()
+      )
+
+      const index = events.value.findIndex(
+        event => String(event.id) === eventId
+      )
+
+      if (index !== -1) {
+        events.value[index] = savedEvent
+      } else {
+        events.value.push(savedEvent)
+      }
+
+      return savedEvent
+
+    } catch (err) {
+      error.value = err.message || 'Gagal memperbarui event'
+      console.error('Update Event Error:', err)
+
+      return false
+
+    } finally {
+      loading.value = false
+    }
   }
 
   // ========================================
   // COMPLETE EVENT
   // ========================================
 
-  const completeEvent = (id) => {
-
-    const target = events.value.find(
-      event => event.id === Number(id)
-    )
-
-    if (target) {
-      target.done = true
-    }
+  const completeEvent = async (id) => {
+    return await updateEvent(id, {
+      done: true
+    })
   }
 
   // ========================================
-  // DELETE EVENT
-  // ========================================
-
-  const deleteEvent = (id) => {
-
-    const eventId = Number(id)
-
-    const index = events.value.findIndex(
-      event => event.id === eventId
-    )
-
-    if (index !== -1) {
-
-      // Hapus event utama
-      events.value.splice(index, 1)
-
-      // Hapus semua tiket terkait event
-      userRegistrations.value =
-        userRegistrations.value.filter(
-          registration =>
-            registration.eventId !== eventId
-        )
-    }
-  }
-
-  // ========================================
-  // GET EVENT BY ID
+  // GET EVENT BY ID FROM LOCAL STATE
   // ========================================
 
   const getEventById = (id) => {
-
     return events.value.find(
-      event => event.id === Number(id)
+      event => String(event.id) === String(id)
     )
   }
 
@@ -180,67 +425,71 @@ export function useEvents() {
   // REGISTER ATTENDEE
   // ========================================
 
-  const registerAttendee = (eventId, participantData) => {
+  const registerAttendee = async (eventId, participantData) => {
 
-    // Cari event berdasarkan ID
-    const event = events.value.find(
-      event => event.id === Number(eventId)
+    const id = String(eventId)
+
+    let event = getEventById(id)
+
+    if (!event) {
+      event = await fetchEventById(id)
+    }
+
+    if (!event || event.done || Number(event.quota) <= 0) {
+      return null
+    }
+
+    // Check duplicate registration
+    const alreadyRegistered = userRegistrations.value.some(
+      registration =>
+        String(registration.eventId) === id
     )
-
-    // Validasi event
-    if (!event || event.done) {
-      return null
-    }
-
-    // Validasi kuota
-    if (event.quota <= 0) {
-      return null
-    }
-
-    // Cegah pendaftaran ganda pada browser ini
-    const alreadyRegistered =
-      userRegistrations.value.some(
-        registration =>
-          registration.eventId === Number(eventId)
-      )
 
     if (alreadyRegistered) {
       return null
     }
 
-    // Membuat booking code unik
+    // Validate participant data
+    if (
+      !participantData.fullName?.trim() ||
+      !participantData.email?.trim() ||
+      !participantData.phone?.trim()
+    ) {
+      throw new Error('Data peserta belum lengkap.')
+    }
+
+    // Generate booking reference
     const bookingCode =
       'GTH-' +
       Date.now().toString(36).toUpperCase() +
       '-' +
       Math.random().toString(36).slice(2, 7).toUpperCase()
 
-    // Membuat data registrasi
+    // Update event quota in MockAPI
+    const updatedEvent = await updateEvent(id, {
+      quota: Number(event.quota) - 1
+    })
+
+    if (!updatedEvent) {
+      throw new Error('Gagal memperbarui kuota event.')
+    }
+
+    // Create registration record
     const registrationRecord = {
-
-      id: Date.now(),
-
-      eventId: Number(eventId),
-
-      bookingCode: bookingCode,
+      id: bookingCode,
+      eventId: id,
+      bookingCode,
 
       registeredAt: new Date().toISOString(),
 
       fullName: participantData.fullName.trim(),
-
       email: participantData.email.trim(),
-
       phone: participantData.phone.trim(),
-
-      dob: participantData.dob,
-
-      reason: participantData.reason.trim()
+      dob: participantData.dob || '',
+      reason: (participantData.reason || '').trim()
     }
 
-    // Mengurangi kuota event
-    event.quota = Math.max(0, event.quota - 1)
-
-    // Menyimpan registrasi terbaru
+    // Save registration locally
     userRegistrations.value.unshift(registrationRecord)
 
     return registrationRecord
@@ -251,10 +500,9 @@ export function useEvents() {
   // ========================================
 
   const isUserRegistered = (eventId) => {
-
     return userRegistrations.value.some(
       registration =>
-        registration.eventId === Number(eventId)
+        String(registration.eventId) === String(eventId)
     )
   }
 
@@ -263,10 +511,9 @@ export function useEvents() {
   // ========================================
 
   const getRegistrationByEventId = (eventId) => {
-
     return userRegistrations.value.find(
       registration =>
-        registration.eventId === Number(eventId)
+        String(registration.eventId) === String(eventId)
     )
   }
 
@@ -275,7 +522,6 @@ export function useEvents() {
   // ========================================
 
   const isEventDone = (eventId) => {
-
     const event = getEventById(eventId)
 
     return event ? event.done : false
@@ -285,32 +531,33 @@ export function useEvents() {
   // CANCEL REGISTRATION
   // ========================================
 
-  const cancelRegistration = (eventId) => {
+  const cancelRegistration = async (eventId) => {
 
-    const numericId = Number(eventId)
+    const id = String(eventId)
 
-    // Cari registrasi peserta
-    const index = userRegistrations.value.findIndex(
+    const registrationIndex = userRegistrations.value.findIndex(
       registration =>
-        registration.eventId === numericId
+        String(registration.eventId) === id
     )
 
-    if (index === -1) {
-      return false
+    if (registrationIndex === -1) return false
+
+    let event = getEventById(id)
+
+    if (!event) {
+      event = await fetchEventById(id)
     }
 
-    // Cari event terkait
-    const event = events.value.find(
-      event => event.id === numericId
-    )
-
-    // Kembalikan kuota jika event masih aktif
     if (event && !event.done) {
-      event.quota += 1
+
+      const updatedEvent = await updateEvent(id, {
+        quota: Number(event.quota) + 1
+      })
+
+      if (!updatedEvent) return false
     }
 
-    // Hapus data pendaftaran
-    userRegistrations.value.splice(index, 1)
+    userRegistrations.value.splice(registrationIndex, 1)
 
     return true
   }
@@ -319,71 +566,67 @@ export function useEvents() {
   // CLEAR ALL EVENTS
   // ========================================
 
-  const clearAllEvents = () => {
+  const clearAllEvents = async () => {
 
-    events.value = []
+    const ids = events.value.map(event => event.id)
 
-    // Registrasi juga dihapus supaya
-    // tidak ada tiket tanpa event
-    userRegistrations.value = []
+    let success = true
 
-    localStorage.removeItem(EVENTS_STORAGE_KEY)
-    localStorage.removeItem(REGISTRATIONS_STORAGE_KEY)
+    for (const id of ids) {
+      const deleted = await deleteEvent(id)
+
+      if (!deleted) {
+        success = false
+      }
+    }
+
+    return success
   }
 
   // ========================================
   // CLEAR ALL REGISTRATIONS
   // ========================================
 
-  const clearAllRegistrations = () => {
+  const clearAllRegistrations = async () => {
 
-    // Mengembalikan kuota untuk tiket aktif
-    userRegistrations.value.forEach(registration => {
+    const registrations = [...userRegistrations.value]
 
-      const event = events.value.find(
-        event => event.id === registration.eventId
-      )
-
-      if (event && !event.done) {
-        event.quota += 1
-      }
-    })
-
-    userRegistrations.value = []
-
-    localStorage.removeItem(REGISTRATIONS_STORAGE_KEY)
+    for (const registration of registrations) {
+      await cancelRegistration(registration.eventId)
+    }
   }
 
   // ========================================
-  // RETURN SHARED STATE & ACTIONS
+  // RETURN STATE & ACTIONS
   // ========================================
 
   return {
-
-    // EVENT STATE
     events,
+    loading,
+    error,
+
     totalEvents,
     activeEvents,
     completedEvents,
 
-    // REGISTRATION STATE
     userRegistrations,
     totalRegistrations,
 
-    // EVENT ACTIONS
+    fetchEvents,
+    fetchEventById,
+
     createEvent,
+    updateEvent,
     completeEvent,
     deleteEvent,
     getEventById,
 
-    // REGISTRATION ACTIONS
     registerAttendee,
     cancelRegistration,
     isUserRegistered,
     getRegistrationByEventId,
     isEventDone,
 
-    // RESET ACTIONS
     clearAllEvents,
     clearAllRegistrations
   }
